@@ -1,0 +1,7 @@
+shodan:
+  api_key: "Y3lP8xw2RF0KkqRD3ruKzl3K3iuuKxfHf"
+
+settings:
+  threads: 20
+  timeout: 10
+  user_agent: "Aura-Scanner/1.0 (National Security Audit)"
