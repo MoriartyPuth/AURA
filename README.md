@@ -1,13 +1,15 @@
 <div align="center">
   
-  # 🌌 Aura-Scanner
-  **Advanced Unified Risk Assessment**
+  # 🌌 Aura-Scanner **(Advanced Unified Risk Assessment)**
 
   [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python)](https://www.python.org/)
   [![Audit-Level](https://img.shields.io/badge/Audit-National--Security-red?style=for-the-badge)](https://github.com/bubble/Aura-Scanner)
   [![Status](https://img.shields.io/badge/Status-Stable-green?style=for-the-badge)](https://github.com/bubble/Aura-Scanner)
-
+  
  <img width="656" height="277" alt="Aura Logo" src="https://github.com/user-attachments/assets/262b9981-3b2c-48f3-ab4c-d0d3ef7dd925" />
+
+**Aura-Scanner** is a high-velocity, automated security orchestration suite designed for modern infrastructure auditing and threat hunting. It bridges the gap between raw reconnaissance and professional reporting by chaining three distinct phases into a single, unified workflow.
+ 
 </div>
 
 ---
