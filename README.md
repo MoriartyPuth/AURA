@@ -9,54 +9,103 @@
  <img width="656" height="277" alt="Aura Logo" src="https://github.com/user-attachments/assets/262b9981-3b2c-48f3-ab4c-d0d3ef7dd925" />
 </div>
 
-**Aura-Scanner** is a high-velocity, automated security orchestration suite designed for modern infrastructure auditing and threat hunting. It bridges the gap between raw reconnaissance and professional reporting by chaining three distinct phases into a single, unified workflow.
+Aura-Scanner is a modular, high-velocity security auditing framework designed for structured infrastructure reconnaissance, vulnerability analysis, and automated risk reporting.
+
+Unlike typical "shotgun" scanners, Aura follows a Phase-based Audit Lifecycle, transforming raw OSINT and reconnaissance data into actionable executive reports. Built for security professionals, it automates the tedious parts of an audit—recon, fuzzing, and misconfiguration detection—so you can focus on manual exploitation.
 
 ---
 
 ## 💎 Pro-Level Audit Features
 | Feature | Description | Status |
 | :--- | :--- | :--- |
-| **CRT.sh OSINT** | Passive Subdomain Enumeration | ✅ Active |
-| **Shodan API** | IoT & Port Service Mapping | ✅ Active |
-| **Identity Probe** | Detection of /admin, /auth, /config leaks | ✅ Active |
-| **Nuclei Engine** | CVE & Misconfiguration Scanning | ✅ Active |
-| **PDF Reporting** | Executive Summary Generation | ✅ Active |
-| **Slack/Discord Webhooks** | Real-time Leak Alerts | 🛠️ In Progress |
+| **OSINT + Suite** | CRT.sh, Shodan, Wayback, Google Dorking, Favicon Hashing | ✅ Active |
+| **Cloud-Spy** | S3, Azure, & GCP Bucket Permutation/Leak Detection | ✅ Active |
+| **Logic & Identity** | /admin Probing, 403-Bypass, & JWT Signature Analysis | ✅ Active |
+| **Deep-Fuzz Engine** | Nuclei v3, FFuf, & Wapiti Orchestration | ✅ Active |
+| **Quality Gate** | Professional PDF, JSON, CSV, and SARIF | ✅ Active |
+| **Live Notifications** | Slack/Discord Webhooks for Critical Finds | 🛠️ In Progress |
 
 ---
 ## 🛠️ The Audit Lifecycle
-**Phase 0: Passive Recon (OSINT)**
+**Phase 0: Multi-Vector Reconnaissance (OSINT+)**
 
-Aggregates data from CRT.sh (Certificate Transparency) and Shodan API to map a target's global footprint without sending a single packet to their server.
+Aura doesn't just scan; it listens. By aggregating data from Wayback Machine archives, Shodan IoT mapping, and Certificate Transparency (CRT.sh), it builds a global footprint.
 
-**Phase 1: Identity & Logic Probes**
+* **Web Intelligence:** Extracts JS endpoints and performs Favicon MMH3 hashing to find hidden development/staging servers.
 
-A surgical engine that hunts for "Security through Obscurity" failures. It specifically targets exposed administrative portals, authentication endpoints, and sensitive configuration directories.
+* **Cloud Discovery:** Automatically maps and probes S3/Azure/GCP storage infrastructure for misconfigured public access.
 
-**Phase 2: Vulnerability Orchestration**
+**Phase 1: Identity, Logic & Misconfiguration**
 
-Wraps the Nuclei Vulnerability Engine, executing 5,000+ modern templates to detect CVEs, XSS, SQLi, and misconfigurations with zero-false-positive logic.
+A surgical engine designed to hunt for "Security through Obscurity" failures and architectural flaws.
 
-**Phase 3: Executive Reporting**
+* **Bypass Logic:** Automated header-fuzzing to bypass 403 Forbidden and 401 Unauthorized restrictions.
 
-Automated PDF synthesis using the ```fpdf2``` engine. Generates a categorized, timestamped, and professional document ready for immediate stakeholder briefing.
+* **Modern Auth Probing:** Deep analysis of JWT tokens (alg:none, weak secrets) and Subdomain Takeover checks.
+
+* **Service Enrichment:** Fingerprints services using python3-nmap to identify high-risk legacy versions.
+
+**Phase 2: Vulnerability Orchestration & Fuzzing**
+
+The heavy-hitting phase where Aura orchestrates industry-standard engines.
+
+* **Nuclei Integration:** Executes 5,000+ modern templates for CVEs, XSS, and SQLi.
+
+* **Mutation Fuzzing:** Uses ffuf and arjun for high-velocity parameter mining and payload injection.
+
+* **JS Deobfuscation:** Analyzes client-side code using ExecJS to find hardcoded credentials and hidden API routes.
+
+**Phase 3: Executive Reporting & Quality Gate**
+
+Before outputting, all findings pass through the Aura Quality Gate.
+
+* **Risk Normalization:** Deduplicates findings and scores them based on a normalized risk table (CRITICAL to LOW).
+
+* **Automated PDF Synthesis:** Uses the `fpdf2` engine to generate a professional, stakeholder-ready document with prioritized risk tables and implementation checklists.
 
 ---
 
 ## ⚡ Quick Start
-Perform a full-spectrum audit in under 60 seconds.
+Aura-Scanner uses Profiles to balance speed and depth. Choose the profile that matches your current objective:
 
-**Clone the vault**
+1. The 'Quick' Profile
+
+* **Best for:** Initial triage and fast "low-hanging fruit" discovery.
+
+* **Focus:** Passive OSINT, high-level service discovery, and critical CVEs.
+
+* **Speed:** 2–5 minutes.
+
+* **Usage:**
+
 ```
-git clone https://github.com/MoriartyPuth/AURA && cd Aura
+python3 aura.py -u https://target.com --profile quick
 ```
-**Launch the Controller**
+
+2. The 'Normal' Profile (Default)
+
+Best for: Standard security assessments and compliance checks.
+
+* **Focus:** Full Phase 0 & 1, including Cloud-Spy (S3 leaks), 403-Bypass testing, and comprehensive Nuclei orchestration.
+
+* **Speed:** 10–20 minutes.
+
+* **Usage:**
+
 ```
-python3 aura.py -t (http://target.com)
+python3 aura.py -u https://target.com --profile normal
 ```
-**Increase audit speed (Threads: 50)**
+3. The 'Deep' Profile
+
+Best for: Full-scale penetration testing and red-teaming.
+
+* **Focus:** Everything in Normal + heavy directory brute-forcing, JS deobfuscation, parameter mining (Arjun), and mutation fuzzing.
+
+* **Speed:** 60+ minutes (depends on target size).
+
+* **Usage:**
 ```
-python3 aura.py -t http://target.com) --threads 50
+python3 aura.py -u https://target.com --profile deep --export pdf
 ```
 
 ---
@@ -66,6 +115,8 @@ Fine-tune your audit intensity via ```config.yaml```:
 ```
 shodan:
   api_key: "YOUR_API_KEY"  # IoT Discovery Access
+ipinfo:
+  token: "YOUR_IPINFO_TOKEN"
 
 settings:
   threads: 25              # Concurrent audit workers
