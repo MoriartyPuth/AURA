@@ -1,8 +1,84 @@
 shodan:
-  api_key: "YOUR_SHODAN_API"
+  api_key: "YOUR_SHODAN_API_KEY"
+
+ipinfo:
+  token: "YOUR_IPINFO_TOKEN"
 
 settings:
   threads: 20
   timeout: 10
+  http_retries: 2
+  verify_tls: true
   user_agent: "Aura-Scanner/1.0 (National Security Audit)"
 
+recon:
+  google_dorks:
+    - "site:{domain} inurl:admin"
+    - "site:{domain} ext:env"
+    - "site:{domain} intitle:index.of"
+  crawler_max_pages: 25
+
+scope:
+  include_domains: []
+  exclude_domains: []
+  url_regex: ""
+
+state:
+  file: "reports/scan_state.json"
+  resume: false
+
+exports:
+  formats: "json,csv,sarif"
+
+quality:
+  min_confidence: "medium"
+
+scan:
+  profile: "normal"
+
+profiles:
+  quick:
+    crawler_max_pages: 10
+    enable_crawler: false
+    enable_toolchain_health: false
+    enable_deep_scan: false
+    enable_fuzzing: false
+    nuclei_severity: "critical"
+    ffuf_wordlist: "wordlists/common_quick.txt"
+  normal:
+    crawler_max_pages: 25
+    enable_crawler: true
+    enable_toolchain_health: true
+    enable_deep_scan: true
+    enable_fuzzing: true
+    nuclei_severity: "high,critical"
+    ffuf_wordlist: "wordlists/common.txt"
+  deep:
+    crawler_max_pages: 60
+    enable_crawler: true
+    enable_toolchain_health: true
+    enable_deep_scan: true
+    enable_fuzzing: true
+    nuclei_severity: "medium,high,critical"
+    ffuf_wordlist: "wordlists/common_deep.txt"
+
+tuning:
+  ignore_finding_patterns:
+    - "manual review"
+    - "possible issue detected"
+  classic:
+    include_manual_review: false
+    smuggling_status_codes: [400, 411, 413, 500, 502]
+  fuzz:
+    max_seed_urls: 50
+    max_params_per_url: 5
+
+tools:
+  ffuf_wordlist: "wordlists/common.txt"
+  subjack_fingerprints: ""
+  update_templates: false
+  auto_maintenance: false
+  payload_xss: "wordlists/payloads/xss.txt"
+  payload_sqli: "wordlists/payloads/sqli.txt"
+  payload_ssrf: "wordlists/payloads/ssrf.txt"
+  payload_path: "wordlists/payloads/path.txt"

@@ -1,15 +1,30 @@
-import requests, shodan
+import shodan
 from core.logger import Logger
+from ratelimit import limits, sleep_and_retry
+from core.http_utils import build_session
+
+
+@sleep_and_retry
+@limits(calls=4, period=1)
+def _limited_get(session, url, timeout, headers):
+    return session.get(url, timeout=timeout, headers=headers)
+
 
 def run_osint_discovery(engine):
     findings = []
     domain = engine.target.split("//")[-1].split("/")[0]
+    session = build_session(engine.config)
+    try:
+        from fake_useragent import UserAgent
+        ua = UserAgent().random
+    except Exception:
+        ua = "Aura-Scanner/1.0"
 
     # CRT.SH (Passive SSL Logs - No API Key)
     Logger.info(f"Querying CRT.sh for {domain}...")
     try:
         url = f"https://crt.sh/?q={domain}&output=json"
-        r = requests.get(url, timeout=20)
+        r = _limited_get(session, url, timeout=20, headers={"User-Agent": ua})
         if r.status_code == 200:
             subs = set(item['name_value'].lower() for item in r.json() if "*" not in item['name_value'])
             for s in sorted(list(subs))[:15]:

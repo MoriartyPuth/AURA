@@ -1,0 +1,16 @@
+admin
+login
+dashboard
+api
+v1
+v2
+graphql
+health
+metrics
+status
+config
+debug
+backup
+.env
+robots.txt
+sitemap.xml
