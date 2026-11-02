@@ -4,6 +4,11 @@ from core.http_utils import build_session
 
 def run_cloud_checks(engine):
     findings = []
+    if not engine.config.get("scope", {}).get("allow_cloud_bucket_probes", True):
+        Logger.warn("Cloud bucket probes disabled by scope.allow_cloud_bucket_probes.")
+        return findings
+    # NOTE: guessed bucket names live on third-party infrastructure (AWS/GCP/Azure)
+    # and may not belong to the target - disable via config if your program forbids it.
     domain = engine.domain
     session = build_session(engine.config)
     candidates = {

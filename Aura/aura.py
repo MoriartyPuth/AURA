@@ -1,5 +1,4 @@
 import argparse
-import glob
 import os
 import sys
 
@@ -34,6 +33,7 @@ from utils.finding_filters import apply_finding_filters
 from utils.exporters import export_json, export_csv, export_sarif
 from utils.state_store import load_state, save_state, mark_task_completed, is_task_completed, get_task_result
 from utils.checklist_gen import generate_checklists
+from utils.url_seeds import load_url_seeds
 
 def print_banner():
     """Renders the custom AURA block-style logo."""
@@ -118,6 +118,9 @@ def main():
         scope_regex=args.scope_regex,
     )
     cfg = engine.config
+    if not engine.scope.is_in_scope(target):
+        Logger.error(f"Target {target} is outside the configured scope (include/exclude/regex). Aborting.")
+        sys.exit(2)
 
     def setting(cli_value, section, key, default):
         return cli_value if cli_value is not None else cfg.get(section, {}).get(key, default)
@@ -174,7 +177,7 @@ def main():
         ("Identity Leak Checks", lambda: check_identity_leaks(engine)),
         ("JWT Analysis", lambda: analyze_jwt_exposure(engine)),
         ("Subdomain Takeover Checks", lambda: run_takeover_checks(engine)),
-        ("Web Vulnerability Probes", lambda: run_web_probes(target)),
+        ("Web Vulnerability Probes", lambda: run_web_probes(engine)),
         ("Misconfiguration Checks", lambda: run_misconfig_checks(target)),
         ("Classic Vuln Classes", lambda: run_classic_vuln_scans(engine)),
     ])
@@ -230,15 +233,6 @@ def main():
         "maintenance": maintenance,
     }
     generate_checklists("reports/checklist.md", "reports/checklist.json", checklist_evidence)
-
-
-def load_url_seeds():
-    """URLs persisted by URL Intelligence / Crawler (reports/urls_*.txt) to seed the fuzzer."""
-    seeds = []
-    for path in sorted(glob.glob("reports/urls_*.txt")):
-        with open(path, "r", encoding="utf-8") as f:
-            seeds.extend(line.strip() for line in f if line.strip().startswith("http"))
-    return list(dict.fromkeys(seeds))
 
 
 if __name__ == "__main__":

@@ -18,15 +18,17 @@ class ScopeManager:
         parsed = urlparse(value if "//" in value else f"//{value}")
         return (parsed.hostname or "").lower()
 
-    def is_in_scope(self, value):
+    def is_host_in_scope(self, value):
+        """Domain rules only (no URL regex) - for bare hostnames such as subdomain lists."""
         host = self._extract_host(value)
         if not host:
             return False
         if any(_matches(host, d) for d in self.exclude_domains):
             return False
         allowed = self.include_domains or ([self.base_domain] if self.base_domain else [])
-        if allowed and not any(_matches(host, d) for d in allowed):
+        return not allowed or any(_matches(host, d) for d in allowed)
+
+    def is_in_scope(self, value):
+        if not self.is_host_in_scope(value):
             return False
-        if self.scope_re and not self.scope_re.search(value):
-            return False
-        return True
+        return not (self.scope_re and not self.scope_re.search(value))

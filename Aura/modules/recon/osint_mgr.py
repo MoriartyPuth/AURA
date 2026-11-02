@@ -21,7 +21,10 @@ def run_osint_discovery(engine):
     try:
         r = _limited_get(session, f"https://crt.sh/?q={domain}&output=json", timeout=20)
         if r.status_code == 200:
-            subs = {item["name_value"].lower() for item in r.json() if "*" not in item["name_value"]}
+            # name_value can hold several newline-separated names per certificate.
+            names = {n.strip().lower() for item in r.json() for n in item["name_value"].splitlines()}
+            subs = {n for n in names if n and "*" not in n}
+            subs = {s for s in subs if engine.scope.is_host_in_scope(s)}
             for s in sorted(subs)[:15]:
                 Logger.success(f"Subdomain: {s}")
                 findings.append(f"Subdomain Found: {s}")

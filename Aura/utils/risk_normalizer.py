@@ -39,6 +39,10 @@ SEVERITY_PATTERNS = [
     for sev, kws in SEVERITY_KEYWORDS
 ]
 
+# Tool-verified findings (e.g. sqlmap-confirmed injection) outrank heuristic ones.
+CONFIRMED_RE = re.compile(r"\bconfirmed\b", re.IGNORECASE)
+CONFIRMED_BONUS = 10
+
 
 def infer_severity(text):
     # Ignore the quality gate's "[HIGH]/[MEDIUM]/[LOW]" confidence tag: it is not a severity.
@@ -59,6 +63,8 @@ def build_risk_table(phase_map):
             for entry in entries or []:
                 severity = infer_severity(entry)
                 score = SEVERITY_SCORES[severity] + SOURCE_BONUS.get(source, 0)
+                if CONFIRMED_RE.search(entry):
+                    score += CONFIRMED_BONUS
                 key = normalize_key(entry, strip_ips=True)
                 item = {
                     "severity": severity.upper(),

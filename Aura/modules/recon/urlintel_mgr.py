@@ -8,7 +8,10 @@ URL_SEED_FILE = "reports/urls_historical.txt"
 
 def collect_archived_urls(engine):
     """Run gau/waybackurls once per scan; shared by URL intel and parameter mining."""
-    return engine.cached("archived_urls", lambda: _run_url_tools(engine.domain))
+    return engine.cached(
+        "archived_urls",
+        lambda: [u for u in _run_url_tools(engine.domain) if engine.scope.is_in_scope(u)],
+    )
 
 
 def _run_url_tools(domain):
@@ -31,8 +34,7 @@ def _run_url_tools(domain):
 
 
 def run_url_intel(engine):
-    urls = collect_archived_urls(engine)
-    in_scope = [u for u in urls if engine.scope.is_in_scope(u)]
+    in_scope = collect_archived_urls(engine)
     # Persist so the Phase 2 fuzzer can use these as seeds (also survives --resume).
     os.makedirs("reports", exist_ok=True)
     with open(URL_SEED_FILE, "w", encoding="utf-8") as f:

@@ -4,7 +4,14 @@ from core.tool_runner import is_tool_available, run_command
 
 def collect_subdomains(engine):
     """Run subfinder/assetfinder once per scan; shared by enumeration and takeover checks."""
-    return engine.cached("subdomains", lambda: _run_subdomain_tools(engine.domain))
+    def collect():
+        found = _run_subdomain_tools(engine.domain)
+        in_scope = [s for s in found if engine.scope.is_host_in_scope(s)]
+        if len(in_scope) < len(found):
+            Logger.info(f"Scope: dropped {len(found) - len(in_scope)} out-of-scope subdomains.")
+        return in_scope
+
+    return engine.cached("subdomains", collect)
 
 
 def _run_subdomain_tools(domain):

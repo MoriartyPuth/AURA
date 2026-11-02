@@ -12,7 +12,8 @@ def run_deep_scans(target, wordlist=None):
             "-u", f"{target}/FUZZ",
             "-w", wordlist,
             "-mc", "200,204,301,302,307,401,403",
-            "-s"
+            "-ac",  # auto-calibrate: filter soft-404 / catch-all responses
+            "-s",
         ]
         code, out, err = run_command(cmd, timeout=240)
         if code == 0:
@@ -29,7 +30,7 @@ def run_deep_scans(target, wordlist=None):
 
     if is_tool_available("wapiti"):
         Logger.info("Phase 2: running wapiti web vulnerability scan...")
-        code, out, err = run_command(["wapiti", "-u", target, "-f", "txt"], timeout=300)
+        code, out, err = run_command(["wapiti", "-u", target, "--scope", "folder", "-f", "txt"], timeout=300)
         text = (out or "") + "\n" + (err or "")
         if code == 0 and "vulnerab" in text.lower():
             findings.append("Wapiti: potential web vulnerabilities detected")

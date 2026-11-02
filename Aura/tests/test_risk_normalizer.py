@@ -25,6 +25,13 @@ class TestInferSeverity(unittest.TestCase):
         self.assertEqual(len(table), 1)
         self.assertEqual(table[0]["source"], "Classic Vuln Classes")
 
+    def test_confirmed_outranks_heuristic(self):
+        table = build_risk_table({"P": {
+            "Payload Mutation Fuzzing": ["[MEDIUM] Fuzz-XSS Reflection: id at /item"],
+            "Web Vulnerability Probes": ["[HIGH] SQLi confirmed by sqlmap: id (GET) at http://x/item?id=1"],
+        }})
+        self.assertIn("SQLi confirmed", table[0]["finding"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -26,6 +26,7 @@ def run_crawler_pipeline(engine, max_pages=25):
     seen_pages = set()
     queued = deque([engine.target])
     discovered_endpoints = set()
+    param_urls = set()  # links with query strings: seeds for probes/fuzzing
 
     session = build_session(engine.config)
 
@@ -48,6 +49,8 @@ def run_crawler_pipeline(engine, max_pages=25):
             if engine.scope.is_in_scope(candidate):
                 parsed = urlparse(candidate)
                 clean = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+                if parsed.query:
+                    param_urls.add(f"{clean}?{parsed.query}")
                 if clean not in seen_pages:
                     queued.append(clean)
 
@@ -73,7 +76,7 @@ def run_crawler_pipeline(engine, max_pages=25):
     # Persist so the Phase 2 fuzzer can use these as seeds (also survives --resume).
     os.makedirs("reports", exist_ok=True)
     with open("reports/urls_crawled.txt", "w", encoding="utf-8") as f:
-        f.writelines(f"{u}\n" for u in sorted(seen_pages | discovered_endpoints))
+        f.writelines(f"{u}\n" for u in sorted(seen_pages | discovered_endpoints | param_urls))
 
     for page in sorted(seen_pages):
         findings.append(f"Crawled: {page}")
