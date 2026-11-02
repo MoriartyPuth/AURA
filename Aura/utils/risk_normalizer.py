@@ -42,7 +42,7 @@ SEVERITY_PATTERNS = [
 ]
 
 # Tool-verified findings (e.g. sqlmap-confirmed injection) outrank heuristic ones.
-CONFIRMED_RE = re.compile(r"\bconfirmed\b", re.IGNORECASE)
+CONFIRMED_RE = re.compile(r"\b(confirmed|verified)\b", re.IGNORECASE)
 CONFIRMED_BONUS = 10
 
 

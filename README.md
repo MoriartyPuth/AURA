@@ -25,7 +25,7 @@ Unlike typical "shotgun" scanners, Aura follows a Phase-based Audit Lifecycle, t
 | **Authorization (IDOR/BOLA)** | Two-account + anonymous replay of in-scope endpoints to find horizontal authz / missing-auth bugs (opt-in, GET-only) | ✅ Active |
 | **Vuln Probes** | sqlmap & dalfox on real parameterised URLs from recon (findings parsed from tool results); SSTI/LFI/CORS/CRLF/open-redirect checks; payload mutation fuzzing | ✅ Active |
 | **Deep Scan** | Nuclei (severity per profile), ffuf with auto-calibration, wapiti | ✅ Active |
-| **CVE Detection** | Stack fingerprint (headers + whatweb) and nuclei CVE/vulnerability templates; refreshes templates for the latest signatures | ✅ Active |
+| **CVE Detection** | Stack fingerprint (headers + whatweb) and nuclei CVE/vulnerability templates; findings enriched with CVSS, exploit/PoC references and `searchsploit`/`msfconsole` lookup commands (`reports/cve_details.json`) | ✅ Active |
 | **Takeover** | subzy / subjack on in-scope subdomains | ✅ Active |
 | **Reporting** | Confidence gate, severity scoring & dedup, PDF / JSON / CSV / SARIF | ✅ Active |
 | **403/401 Bypass** | Header/path fuzzing against forbidden endpoints | 🗺️ Planned |
@@ -59,6 +59,8 @@ Aggregates Certificate Transparency (crt.sh), Wayback/gau archives, Shodan, DNS 
 * **Nuclei Integration:** Runs the installed nuclei templates at the profile's severity level.
 
 * **CVE Detection:** Fingerprints the stack from response headers and `whatweb`, then runs nuclei's `cve`/`vulnerabilities` templates at all severities. Run with `--update-toolchain` to refresh templates first so the latest CVE signatures are used. nuclei's template feed is the matching engine — see [`SOURCES.md`](Aura/SOURCES.md) for coverage and limits.
+
+  Each confirmed CVE is tagged `[VERIFIED]` and enriched with its CVSS score, exploit/PoC reference links and the `searchsploit` / `msfconsole` lookup commands for retrieving the public exploit (full data in `reports/cve_details.json`). AURA confirms and documents — it does not launch exploits; running one is a manual step the operator performs against an authorized target.
 
 * **Content Discovery:** ffuf with auto-calibration (`-ac`) to filter catch-all responses; wapiti limited to the target folder.
 

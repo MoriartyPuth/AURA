@@ -65,7 +65,7 @@ class TestCveNucleiParsing(unittest.TestCase):
                 cve_mgr.NUCLEI_CVE_OUT, cve_mgr.is_tool_available, cve_mgr.run_command = orig_out, orig_avail, orig_run
 
         self.assertEqual(len(findings), 2)  # CVE-2021-1 once + the info template
-        self.assertTrue(any(f.startswith("CVE CVE-2021-1 [CRITICAL]") for f in findings))
+        self.assertTrue(any(f.startswith("CVE CVE-2021-1 [CRITICAL] [VERIFIED]") for f in findings))
 
     def test_skips_without_nuclei(self):
         orig = cve_mgr.is_tool_available
