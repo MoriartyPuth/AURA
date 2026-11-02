@@ -12,6 +12,8 @@ CHECKLIST = [
     {"id": "exports", "title": "JSON/CSV/SARIF outputs generated"},
     {"id": "cloud-coverage", "title": "Cloud checks expanded beyond S3"},
     {"id": "quality-gate", "title": "Confidence quality gate enforced"},
+    {"id": "authz-testing", "title": "Two-account authorization (IDOR/BOLA) testing enabled"},
+    {"id": "cve-detection", "title": "CVE detection (fingerprint + nuclei templates) run"},
     {"id": "http-hardening", "title": "HTTP TLS verify/retry policy enabled"},
     {"id": "tests", "title": "Core hardening tests passed"},
     {"id": "profiles", "title": "Quick/Normal/Deep scan profiles configured"},

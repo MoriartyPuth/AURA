@@ -22,8 +22,10 @@ Unlike typical "shotgun" scanners, Aura follows a Phase-based Audit Lifecycle, t
 | **Recon Orchestration** | subfinder/assetfinder, gau/waybackurls, naabu, httpx, nmap, arjun, in-scope crawler with JS endpoint extraction | ✅ Active |
 | **Cloud Bucket Probes** | Guesses S3 / GCS / Azure Blob names from the domain and checks existence/listability | ✅ Active (opt-out) |
 | **Identity & Exposure** | Sensitive-path probing with soft-404 filtering; JWT discovery + `alg=none` detection | ✅ Active |
+| **Authorization (IDOR/BOLA)** | Two-account + anonymous replay of in-scope endpoints to find horizontal authz / missing-auth bugs (opt-in, GET-only) | ✅ Active |
 | **Vuln Probes** | sqlmap & dalfox on real parameterised URLs from recon (findings parsed from tool results); SSTI/LFI/CORS/CRLF/open-redirect checks; payload mutation fuzzing | ✅ Active |
 | **Deep Scan** | Nuclei (severity per profile), ffuf with auto-calibration, wapiti | ✅ Active |
+| **CVE Detection** | Stack fingerprint (headers + whatweb) and nuclei CVE/vulnerability templates; refreshes templates for the latest signatures | ✅ Active |
 | **Takeover** | subzy / subjack on in-scope subdomains | ✅ Active |
 | **Reporting** | Confidence gate, severity scoring & dedup, PDF / JSON / CSV / SARIF | ✅ Active |
 | **403/401 Bypass** | Header/path fuzzing against forbidden endpoints | 🗺️ Planned |
@@ -48,11 +50,15 @@ Aggregates Certificate Transparency (crt.sh), Wayback/gau archives, Shodan, DNS 
 
 * **Injection Probes:** sqlmap and dalfox run against real parameterised URLs discovered in Phase 0. Findings are read from sqlmap's result log and dalfox's JSON output — only confirmed injection points (sqlmap) and verified/reflected PoCs (dalfox) are reported.
 
+* **Authorization (IDOR/BOLA):** Opt-in. Given two user accounts, AURA replays every in-scope endpoint as the victim, the attacker and anonymously, and flags cases where the attacker (or an unauthenticated request) receives the victim's resource. GET-only, never mutates, credentials are never written to the report. Enable via the `auth:` block in `config.yaml`.
+
 * **Classic Checks & Takeover:** SSTI, LFI/RFI, XXE, CRLF, CORS, open redirect, TE/CL smuggling heuristic; subzy/subjack takeover checks; whatweb/nikto.
 
 **Phase 2: Vulnerability Orchestration & Fuzzing**
 
 * **Nuclei Integration:** Runs the installed nuclei templates at the profile's severity level.
+
+* **CVE Detection:** Fingerprints the stack from response headers and `whatweb`, then runs nuclei's `cve`/`vulnerabilities` templates at all severities. Run with `--update-toolchain` to refresh templates first so the latest CVE signatures are used. nuclei's template feed is the matching engine — see [`SOURCES.md`](Aura/SOURCES.md) for coverage and limits.
 
 * **Content Discovery:** ffuf with auto-calibration (`-ac`) to filter catch-all responses; wapiti limited to the target folder.
 

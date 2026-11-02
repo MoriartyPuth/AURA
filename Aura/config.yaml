@@ -25,6 +25,18 @@ scope:
   # to someone else. Set false if your engagement/program rules forbid that.
   allow_cloud_bucket_probes: true
 
+# Two-account authorization testing (IDOR/BOLA). OFF by default. Only runs when
+# enabled AND both accounts are set. GET-only, scope-checked, never mutates.
+# Credentials are read here only and are never written to any report.
+auth:
+  enabled: false
+  victim:
+    headers: {}      # e.g. {Cookie: "session=<victim-cookie>"}
+  attacker:
+    headers: {}      # e.g. {Cookie: "session=<attacker-cookie>"}
+  endpoints: []      # optional extra authenticated-only paths, e.g. ["/api/me"]
+  max_urls: 150
+
 state:
   file: "reports/scan_state.json"
   resume: false
@@ -45,6 +57,7 @@ profiles:
     enable_toolchain_health: false
     enable_deep_scan: false
     enable_fuzzing: false
+    enable_cve_scan: false
     nuclei_severity: "critical"
     ffuf_wordlist: "wordlists/common_quick.txt"
   normal:
@@ -53,6 +66,7 @@ profiles:
     enable_toolchain_health: true
     enable_deep_scan: true
     enable_fuzzing: true
+    enable_cve_scan: true
     nuclei_severity: "high,critical"
     ffuf_wordlist: "wordlists/common.txt"
   deep:
@@ -61,6 +75,7 @@ profiles:
     enable_toolchain_health: true
     enable_deep_scan: true
     enable_fuzzing: true
+    enable_cve_scan: true
     nuclei_severity: "medium,high,critical"
     ffuf_wordlist: "wordlists/common_deep.txt"
 
