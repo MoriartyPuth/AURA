@@ -1,37 +1,125 @@
+"""dalfox (XSS) and sqlmap (SQLi) probes.
+
+Findings come from the tools' structured result files, not from grepping their
+console output (which contains words like "payload" on every run)."""
+import glob
+import json
+import os
+import re
+import tempfile
+from urllib.parse import urlparse
+
 from core.logger import Logger
 from core.tool_runner import is_tool_available, run_command
+from utils.url_seeds import load_url_seeds
+
+_DALFOX_LINE_RE = re.compile(r"\[POC\]\[(?P<type>[VRG])\]\[(?P<method>\w+)\]\[(?P<inject>[^\]]*)\]\s+(?P<url>\S+)")
+_SQLMAP_PARAM_RE = re.compile(r"^Parameter:\s*(?P<param>.+)$", re.MULTILINE)
+_SQLMAP_TYPE_RE = re.compile(r"^\s+Type:\s*(?P<type>.+)$", re.MULTILINE)
 
 
-def run_web_probes(target):
+def select_probe_urls(engine, fallback_query, max_urls):
+    """Prefer real parameterised URLs found during recon; fall back to a synthetic one."""
+    seen_shapes, picked = set(), []
+    for url in load_url_seeds():
+        parsed = urlparse(url)
+        if not parsed.query or not engine.scope.is_in_scope(url):
+            continue
+        shape = (parsed.netloc, parsed.path)  # one URL per endpoint
+        if shape in seen_shapes:
+            continue
+        seen_shapes.add(shape)
+        picked.append(url)
+        if len(picked) >= max_urls:
+            break
+    return picked or [f"{engine.target}/?{fallback_query}"]
+
+
+def parse_dalfox_output(text):
+    """Return [(type, param_or_inject, url)] from dalfox JSON / JSONL / plain POC output."""
+    results = []
+    text = (text or "").strip()
+    if not text:
+        return results
+    records = None
+    try:
+        data = json.loads(text)
+        records = data if isinstance(data, list) else [data]
+    except json.JSONDecodeError:
+        try:
+            records = [json.loads(line) for line in text.splitlines() if line.strip().startswith("{")]
+        except json.JSONDecodeError:
+            records = None
+    if records:
+        for r in records:
+            if isinstance(r, dict) and r.get("type"):
+                results.append((r["type"], r.get("param") or r.get("inject_type", ""), r.get("data", "")))
+        return results
+    for m in _DALFOX_LINE_RE.finditer(text):
+        results.append((m.group("type"), m.group("inject"), m.group("url")))
+    return results
+
+
+def parse_sqlmap_log(text):
+    """Return [(parameter, [technique, ...])] from a sqlmap output-dir `log` file."""
+    results = []
+    blocks = _SQLMAP_PARAM_RE.split(text or "")
+    # split() yields [prefix, param1, body1, param2, body2, ...]
+    for i in range(1, len(blocks) - 1, 2):
+        techniques = [t.strip() for t in _SQLMAP_TYPE_RE.findall(blocks[i + 1])]
+        results.append((blocks[i].strip(), techniques))
+    return results
+
+
+def _run_dalfox(url):
     findings = []
-    probes = [
-        (
-            "dalfox",
-            ["dalfox", "url", f"{target}?q=test", "--skip-bav", "--silence"],
-            "XSS Probe",
-            180
-        ),
-        (
-            "sqlmap",
-            ["sqlmap", "-u", f"{target}?id=1", "--batch", "--level", "1", "--risk", "1"],
-            "SQLi Probe",
-            240
-        ),
-    ]
+    with tempfile.TemporaryDirectory(prefix="aura-dalfox-") as tmp:
+        out_file = os.path.join(tmp, "dalfox.json")
+        cmd = ["dalfox", "url", url, "--skip-bav", "--silence", "--no-color", "--format", "json", "-o", out_file]
+        code, out, _ = run_command(cmd, timeout=300)
+        text = open(out_file, encoding="utf-8").read() if os.path.exists(out_file) else out
+    if code != 0:
+        Logger.warn("dalfox finished with non-zero exit code.")
+    seen = set()
+    for poc_type, where, poc_url in parse_dalfox_output(text):
+        if poc_type not in {"V", "R"} or (poc_type, where) in seen:
+            continue  # "G" (grep) entries are pattern matches, not XSS
+        seen.add((poc_type, where))
+        if poc_type == "V":
+            findings.append(f"XSS confirmed by dalfox (DOM-verified): {where} -> {poc_url}")
+        else:
+            findings.append(f"XSS reflected payload (dalfox, unverified): {where} -> {poc_url}")
+    return findings
 
-    for tool_name, command, label, timeout in probes:
+
+def _run_sqlmap(url):
+    findings = []
+    with tempfile.TemporaryDirectory(prefix="aura-sqlmap-") as tmp:
+        cmd = ["sqlmap", "-u", url, "--batch", "--level", "1", "--risk", "1", "--output-dir", tmp, "--disable-coloring"]
+        code, _, _ = run_command(cmd, timeout=600)
+        logs = glob.glob(os.path.join(tmp, "*", "log"))
+        text = "\n".join(open(p, encoding="utf-8", errors="replace").read() for p in logs)
+    if code != 0:
+        Logger.warn("sqlmap finished with non-zero exit code.")
+    for param, techniques in parse_sqlmap_log(text):
+        findings.append(f"SQLi confirmed by sqlmap: {param} at {url} [{'; '.join(techniques)}]")
+    return findings
+
+
+def run_web_probes(engine):
+    findings = []
+    max_urls = int(engine.config.get("tuning", {}).get("probes", {}).get("max_urls", 3))
+    probes = [
+        ("dalfox", "XSS", "q=test", _run_dalfox),
+        ("sqlmap", "SQLi", "id=1", _run_sqlmap),
+    ]
+    for tool_name, label, fallback_query, runner in probes:
         if not is_tool_available(tool_name):
             Logger.warn(f"{tool_name} not found. Skipping.")
             continue
-
-        Logger.info(f"Phase 1: running {label} with {tool_name}...")
-        code, out, err = run_command(command, timeout=timeout)
-        text = (out or "") + "\n" + (err or "")
-        lowered = text.lower()
-        if code == 0 and any(key in lowered for key in ["vulnerable", "found", "injection", "payload"]):
-            findings.append(f"{label}: potential issue detected by {tool_name}")
-            Logger.critical(f"{label}: potential vulnerability")
-        elif code != 0:
-            Logger.warn(f"{tool_name} finished with non-zero exit code.")
-
+        for url in select_probe_urls(engine, fallback_query, max_urls):
+            Logger.info(f"Phase 1: {label} probe with {tool_name} -> {url}")
+            for finding in runner(url):
+                Logger.critical(finding)
+                findings.append(finding)
     return findings

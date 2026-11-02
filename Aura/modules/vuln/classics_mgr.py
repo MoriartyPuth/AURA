@@ -4,9 +4,12 @@ from core.logger import Logger
 from core.http_utils import build_session
 
 
+SSTI_PRODUCT = str(1337 * 7331)
+
 TEST_CASES = [
     ("SSRF", "/?url=http://169.254.169.254/latest/meta-data/"),
-    ("SSTI", "/?name={{7*7}}"),
+    # Unique product: "49" appears on countless pages, 9801547 essentially never does.
+    ("SSTI", "/?name=" + quote("{{1337*7331}}${1337*7331}")),
     ("XXE", "/?xml=" + quote("""<?xml version="1.0"?><!DOCTYPE x [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]><a>&xxe;</a>""")),
     ("NoSQLi", "/?username[$ne]=1&password[$ne]=1"),
     ("CRLF", "/%0d%0aSet-Cookie:crlf=1"),
@@ -19,9 +22,8 @@ TEST_CASES = [
 
 def run_classic_vuln_scans(engine):
     findings = []
-    headers = {"User-Agent": (engine.config or {}).get("settings", {}).get("user_agent", "Aura-Scanner/1.0")}
     session = build_session(engine.config)
-    classic_cfg = (engine.config or {}).get("tuning", {}).get("classic", {})
+    classic_cfg = engine.config.get("tuning", {}).get("classic", {})
     include_manual_review = bool(classic_cfg.get("include_manual_review", False))
     smuggling_codes = set(classic_cfg.get("smuggling_status_codes", [400, 411, 413, 500, 502]))
 
@@ -30,11 +32,11 @@ def run_classic_vuln_scans(engine):
         if not engine.scope.is_in_scope(url):
             continue
         try:
-            r = session.get(url, timeout=session._aura_timeout, headers=headers, allow_redirects=False)
+            r = session.get(url, allow_redirects=False)
             body = (r.text or "").lower()
             h = {k.lower(): v for k, v in r.headers.items()}
-            if label == "SSTI" and "49" in body:
-                findings.append("SSTI: possible expression evaluation")
+            if label == "SSTI" and SSTI_PRODUCT in body:
+                findings.append(f"SSTI: template expression evaluated ({SSTI_PRODUCT} rendered)")
             elif label == "XXE" and "root:x:" in body:
                 findings.append("XXE: file disclosure indicator")
             elif label in {"LFI", "RFI"} and "root:x:" in body:
@@ -53,7 +55,7 @@ def run_classic_vuln_scans(engine):
     # Request smuggling heuristic
     try:
         crafted_headers = {"Transfer-Encoding": "chunked", "Content-Length": "4"}
-        r = session.post(engine.target, data="0\r\n\r\n", timeout=session._aura_timeout, headers=crafted_headers)
+        r = session.post(engine.target, data="0\r\n\r\n", headers=crafted_headers)
         if r.status_code in smuggling_codes:
             findings.append("Request Smuggling: ambiguous TE/CL handling heuristic observed")
     except Exception:

@@ -1,7 +1,7 @@
 import csv
 import json
 import os
-from datetime import datetime
+from utils.common import utc_now_iso
 
 
 def _flatten_results(phase_map):
@@ -22,7 +22,7 @@ def _flatten_results(phase_map):
 def export_json(path, target, phase_map, risks):
     payload = {
         "target": target,
-        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "generated_at": utc_now_iso(),
         "phases": phase_map,
         "risks": risks,
     }

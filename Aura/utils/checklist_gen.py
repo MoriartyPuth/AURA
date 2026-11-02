@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from utils.common import utc_now_iso
 
 
 CHECKLIST = [
@@ -26,10 +26,10 @@ def _status_from_evidence(item_id, evidence):
 
 def generate_checklists(report_path, json_path, evidence):
     lines = [
-        f"# Aura Checklist ({datetime.utcnow().isoformat()}Z)",
+        f"# Aura Checklist ({utc_now_iso()})",
         "",
     ]
-    payload = {"generated_at": datetime.utcnow().isoformat() + "Z", "items": []}
+    payload = {"generated_at": utc_now_iso(), "items": []}
 
     for item in CHECKLIST:
         status = _status_from_evidence(item["id"], evidence)

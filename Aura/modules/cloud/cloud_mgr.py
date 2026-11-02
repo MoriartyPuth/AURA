@@ -4,6 +4,11 @@ from core.http_utils import build_session
 
 def run_cloud_checks(engine):
     findings = []
+    if not engine.config.get("scope", {}).get("allow_cloud_bucket_probes", True):
+        Logger.warn("Cloud bucket probes disabled by scope.allow_cloud_bucket_probes.")
+        return findings
+    # NOTE: guessed bucket names live on third-party infrastructure (AWS/GCP/Azure)
+    # and may not belong to the target - disable via config if your program forbids it.
     domain = engine.domain
     session = build_session(engine.config)
     candidates = {
@@ -37,7 +42,7 @@ def run_cloud_checks(engine):
     for bucket in sorted(candidates):
         try:
             gcs_url = f"https://storage.googleapis.com/{bucket}/"
-            gcs = session.get(gcs_url, timeout=session._aura_timeout)
+            gcs = session.get(gcs_url)
             if gcs.status_code in {200, 403}:
                 findings.append(f"GCS Bucket Probe: {bucket} ({gcs.status_code})")
         except Exception:
@@ -45,7 +50,7 @@ def run_cloud_checks(engine):
 
         try:
             az_url = f"https://{bucket}.blob.core.windows.net/?comp=list"
-            az = session.get(az_url, timeout=session._aura_timeout)
+            az = session.get(az_url)
             if az.status_code in {200, 403, 404}:
                 findings.append(f"Azure Blob Probe: {bucket} ({az.status_code})")
         except Exception:

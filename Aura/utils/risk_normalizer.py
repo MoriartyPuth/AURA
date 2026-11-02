@@ -1,5 +1,7 @@
 import re
 
+from utils.common import normalize_key, strip_confidence_tag
+
 
 SEVERITY_SCORES = {
     "critical": 95,
@@ -24,25 +26,31 @@ SOURCE_BONUS = {
 }
 
 
+# Keyword patterns are matched on word boundaries so e.g. "rce" does not match
+# "resources" and "low" does not match "allow".
+SEVERITY_KEYWORDS = [
+    ("critical", ["critical", "takeover", "rce", "auth bypass", "data leak", "xxe", "request smuggling"]),
+    ("high", ["high", "sqli", "xss", "ssrf", "vulnerable", "injection", "ssti", "lfi", "rfi"]),
+    ("medium", ["medium", "misconfig", "misconfiguration", "outdated", "sensitive", "cors", "open redirect", "nosqli", "crlf"]),
+    ("low", ["low", "info leak", "disclosure"]),
+]
+SEVERITY_PATTERNS = [
+    (sev, re.compile(r"\b(" + "|".join(re.escape(k) for k in kws) + r")\b", re.IGNORECASE))
+    for sev, kws in SEVERITY_KEYWORDS
+]
+
+# Tool-verified findings (e.g. sqlmap-confirmed injection) outrank heuristic ones.
+CONFIRMED_RE = re.compile(r"\bconfirmed\b", re.IGNORECASE)
+CONFIRMED_BONUS = 10
+
+
 def infer_severity(text):
-    t = text.lower()
-    if any(k in t for k in ["critical", "takeover", "rce", "auth bypass", "data leak", "xxe", "request smuggling"]):
-        return "critical"
-    if any(k in t for k in ["high", "sqli", "xss", "ssrf", "vulnerable", "injection", "ssti", "lfi", "rfi"]):
-        return "high"
-    if any(k in t for k in ["medium", "misconfig", "outdated", "sensitive", "cors", "open redirect", "nosqli", "crlf"]):
-        return "medium"
-    if any(k in t for k in ["low", "info leak", "disclosure"]):
-        return "low"
+    # Ignore the quality gate's "[HIGH]/[MEDIUM]/[LOW]" confidence tag: it is not a severity.
+    t = strip_confidence_tag(text)
+    for severity, pattern in SEVERITY_PATTERNS:
+        if pattern.search(t):
+            return severity
     return "info"
-
-
-def _normalize_key(text):
-    t = text.lower().strip()
-    t = re.sub(r"https?://", "", t)
-    t = re.sub(r"\b\d{1,3}(\.\d{1,3}){3}\b", "", t)
-    t = re.sub(r"\s+", " ", t)
-    return t
 
 
 def build_risk_table(phase_map):
@@ -55,7 +63,9 @@ def build_risk_table(phase_map):
             for entry in entries or []:
                 severity = infer_severity(entry)
                 score = SEVERITY_SCORES[severity] + SOURCE_BONUS.get(source, 0)
-                key = _normalize_key(entry)
+                if CONFIRMED_RE.search(entry):
+                    score += CONFIRMED_BONUS
+                key = normalize_key(entry, strip_ips=True)
                 item = {
                     "severity": severity.upper(),
                     "score": score,

@@ -5,7 +5,6 @@ ipinfo:
   token: "YOUR_IPINFO_TOKEN"
 
 settings:
-  threads: 20
   timeout: 10
   http_retries: 2
   verify_tls: true
@@ -22,6 +21,9 @@ scope:
   include_domains: []
   exclude_domains: []
   url_regex: ""
+  # Cloud checks probe *guessed* bucket names on AWS/GCP/Azure, which may belong
+  # to someone else. Set false if your engagement/program rules forbid that.
+  allow_cloud_bucket_probes: true
 
 state:
   file: "reports/scan_state.json"
@@ -69,6 +71,8 @@ tuning:
   classic:
     include_manual_review: false
     smuggling_status_codes: [400, 411, 413, 500, 502]
+  probes:
+    max_urls: 3          # parameterised recon URLs handed to dalfox/sqlmap
   fuzz:
     max_seed_urls: 50
     max_params_per_url: 5

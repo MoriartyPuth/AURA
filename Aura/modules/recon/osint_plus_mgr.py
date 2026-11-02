@@ -6,7 +6,7 @@ from core.logger import Logger
 def run_osint_plus(engine):
     findings = []
     domain = engine.domain
-    config = engine.config or {}
+    config = engine.config
 
     # python-whois
     try:

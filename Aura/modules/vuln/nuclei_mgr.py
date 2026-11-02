@@ -1,25 +1,36 @@
-import subprocess, json, os
+import json
+import os
+
 from core.logger import Logger
+from core.tool_runner import is_tool_available, run_command
 
-class NucleiManager:
-    def __init__(self, target):
-        self.target = target
-        self.out = "reports/nuclei_raw.json"
+NUCLEI_OUT = "reports/nuclei_raw.json"
 
-    def run_nuclei(self, severity="high,critical"):
-        findings = []
-        seen = set()
-        cmd = ["nuclei", "-u", self.target, "-severity", severity, "-jsonl", "-o", self.out, "-silent"]
-        try:
-            subprocess.run(cmd, check=True)
-            if os.path.exists(self.out):
-                with open(self.out, 'r') as f:
-                    for line in f:
-                        name = json.loads(line).get('info', {}).get('name')
-                        if name and name not in seen:
-                            seen.add(name)
-                            findings.append(name)
-                            Logger.warn(f"Nuclei: {name}")
-        except Exception as ex:
-            Logger.warn(f"Nuclei execution failed: {ex}")
+
+def run_nuclei(target, severity="high,critical"):
+    findings = []
+    if not is_tool_available("nuclei"):
+        Logger.warn("nuclei not found. Skipping.")
         return findings
+
+    if os.path.exists(NUCLEI_OUT):
+        os.remove(NUCLEI_OUT)  # never report stale results from a previous run
+    cmd = ["nuclei", "-u", target, "-severity", severity, "-jsonl", "-o", NUCLEI_OUT, "-silent"]
+    code, _, err = run_command(cmd, timeout=1800)
+    if code != 0:
+        Logger.warn(f"nuclei returned non-zero: {err}")
+    if not os.path.exists(NUCLEI_OUT):
+        return findings
+
+    seen = set()
+    with open(NUCLEI_OUT, "r", encoding="utf-8") as f:
+        for line in f:
+            try:
+                name = json.loads(line).get("info", {}).get("name")
+            except json.JSONDecodeError:
+                continue
+            if name and name not in seen:
+                seen.add(name)
+                findings.append(f"Nuclei: {name}")
+                Logger.warn(f"Nuclei: {name}")
+    return findings

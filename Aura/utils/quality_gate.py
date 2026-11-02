@@ -1,4 +1,4 @@
-import re
+from utils.common import normalize_key
 
 
 CONF_ORDER = {"low": 1, "medium": 2, "high": 3}
@@ -13,13 +13,6 @@ def _confidence_of_finding(text):
     return "medium"
 
 
-def _norm_key(text):
-    t = (text or "").lower().strip()
-    t = re.sub(r"https?://", "", t)
-    t = re.sub(r"\s+", " ", t)
-    return t
-
-
 def apply_quality_gate(phase_map, min_confidence="medium"):
     min_rank = CONF_ORDER.get((min_confidence or "medium").lower(), 2)
     corroboration = {}
@@ -27,7 +20,7 @@ def apply_quality_gate(phase_map, min_confidence="medium"):
     for _, modules in phase_map.items():
         for _, entries in (modules or {}).items():
             for entry in entries or []:
-                key = _norm_key(entry)
+                key = normalize_key(entry)
                 corroboration[key] = corroboration.get(key, 0) + 1
 
     filtered = {}
@@ -40,7 +33,7 @@ def apply_quality_gate(phase_map, min_confidence="medium"):
             for entry in entries or []:
                 conf = _confidence_of_finding(entry)
                 rank = CONF_ORDER[conf]
-                key = _norm_key(entry)
+                key = normalize_key(entry)
                 # Keep low confidence findings only if corroborated by multiple modules.
                 if conf == "low" and corroboration.get(key, 0) >= 2:
                     rank = max(rank, CONF_ORDER["medium"])

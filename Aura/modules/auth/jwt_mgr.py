@@ -13,10 +13,9 @@ def analyze_jwt_exposure(engine):
     findings = []
     target = engine.target
     session = build_session(engine.config)
-    headers = {"User-Agent": (engine.config or {}).get("settings", {}).get("user_agent", "Aura-Scanner/1.0")}
 
     try:
-        resp = session.get(target, timeout=session._aura_timeout, headers=headers)
+        resp = session.get(target)
     except Exception as ex:
         Logger.warn(f"JWT analysis skipped: {ex}")
         return findings
