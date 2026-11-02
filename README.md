@@ -36,7 +36,7 @@ Unlike typical "shotgun" scanners, Aura follows a Phase-based Audit Lifecycle, t
 ## 🛠️ The Audit Lifecycle
 **Phase 0: Reconnaissance (passive OSINT + active discovery)**
 
-Aggregates Certificate Transparency (crt.sh), Wayback/gau archives, Shodan, DNS and WHOIS into a footprint of the target. Note that this phase is **not purely passive**: it also runs naabu/nmap port scans, httpx, arjun and an in-scope crawler. Phase 0 tasks run in parallel (`settings.phase0_workers`, default 6). When the `auth:` block is configured the crawler runs **authenticated** as the victim account, so the post-login surface is discovered and fed to the probes, fuzzer and authz checks.
+Aggregates Certificate Transparency (crt.sh), Wayback/gau archives, Shodan, DNS and WHOIS into a footprint of the target. Note that this phase is **not purely passive**: it also runs naabu/nmap port scans, httpx, arjun and an in-scope crawler. Phase 0 tasks run in parallel (`settings.phase0_workers`, default 3). When the `auth:` block is configured the crawler runs **authenticated** as the victim account, so the post-login surface is discovered and fed to the probes, fuzzer and authz checks.
 
 * **Web Intelligence:** Page title, favicon MMH3 hash (pivot in Shodan to find related hosts), and API endpoints extracted from linked and inline JavaScript.
 
@@ -149,8 +149,23 @@ ipinfo:
 
 settings:
   timeout: 10              # Network timeout (seconds)
-  user_agent: "YOUR_NAME"
+  phase0_workers: 3        # parallel Phase 0 workers (1 = serial / quietest)
+  user_agent: "Mozilla/5.0 ... Chrome/125.0.0.0 Safari/537.36"   # plain browser UA by default
+  request_delay: 0.0       # seconds between Python requests (global, 0 = off)
+  request_jitter: 0.25     # add random 0..N s per request to desynchronise
+  tool_rate_limit: 50      # req/s cap for nuclei/ffuf/sqlmap/dalfox (0 = tool default)
+  proxy: ""                # route Python + external-tool traffic (e.g. Burp at http://127.0.0.1:8080)
 ```
+
+### Footprint / staying quiet
+AURA's own Python checks are light, but the external scanners it drives (nuclei, ffuf, sqlmap, dalfox, nmap) are what generate load and are easily fingerprinted. To lower the profile:
+
+* The default **User-Agent is a plain browser string** (not `Aura-Scanner`), so it is not a one-rule WAF block. Override via `settings.user_agent`.
+* **Pace requests** with `request_delay` + `request_jitter` (global across the parallel workers) and cap the external tools with `tool_rate_limit`.
+* **Lower `phase0_workers`** (or set `1`) to reduce the simultaneous request spike.
+* **Route everything through a proxy** with `settings.proxy` or `--proxy http://127.0.0.1:8080` (Python requests *and* nuclei/ffuf/sqlmap/dalfox/wapiti), e.g. to send traffic via Burp or a rotating egress.
+
+Note AURA still sends textbook payloads (`../../etc/passwd`, `169.254.169.254`, `{{...}}`, a TE/CL smuggling probe), so a signature WAF can still flag the active checks — the knobs above reduce volume and the obvious client fingerprint, not payload signatures.
 
 ---
 

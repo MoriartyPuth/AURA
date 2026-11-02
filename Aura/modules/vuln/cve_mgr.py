@@ -23,6 +23,7 @@ import re
 
 from core.http_utils import build_session
 from core.logger import Logger
+from core.http_utils import tool_footprint
 from core.tool_runner import is_tool_available, run_command
 from core.findings import Finding
 from modules.vuln.exploit_refs import build_cve_detail, format_finding
@@ -90,6 +91,11 @@ def _run_nuclei_cves(engine, update_templates):
         "-tags", "cve,vulnerabilities",
         "-jsonl", "-o", NUCLEI_CVE_OUT, "-silent",
     ]
+    footprint = tool_footprint(engine.config)
+    if footprint["rate_limit"]:
+        cmd += ["-rl", str(footprint["rate_limit"])]
+    if footprint["proxy"]:
+        cmd += ["-proxy", footprint["proxy"]]
     code, _, err = run_command(cmd, timeout=1800)
     if code != 0:
         Logger.warn(f"nuclei CVE scan returned non-zero: {err}")
