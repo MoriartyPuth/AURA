@@ -34,8 +34,11 @@ auth:
   victim:
     headers: {}      # e.g. {Cookie: "session=<victim-cookie>"}
   attacker:
-    headers: {}      # e.g. {Cookie: "session=<attacker-cookie>"}
-  endpoints: []      # optional extra authenticated-only paths, e.g. ["/api/me"]
+    headers: {}      # e.g. {Cookie: "session=<attacker-cookie>"} (low-priv probe)
+  admin:
+    headers: {}      # optional high-priv account; set it to enable vertical priv-esc checks
+  endpoints: []        # optional extra authenticated-only paths, e.g. ["/api/me"]
+  admin_endpoints: []  # optional admin-only paths, e.g. ["/admin", "/admin/users"]
   max_urls: 150
 
 state:
