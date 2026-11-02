@@ -16,6 +16,7 @@ from modules.recon.service_mgr import run_service_enrichment
 from modules.recon.param_mining_mgr import run_param_mining
 from modules.auth.id_logic import check_identity_leaks
 from modules.auth.jwt_mgr import analyze_jwt_exposure
+from modules.auth.authz_mgr import run_authz_checks
 from modules.cloud.cloud_mgr import run_cloud_checks
 from modules.vuln.probe_mgr import run_web_probes
 from modules.vuln.classics_mgr import run_classic_vuln_scans
@@ -24,6 +25,7 @@ from modules.vuln.misconfig_mgr import run_misconfig_checks
 from modules.vuln.takeover_mgr import run_takeover_checks
 from modules.vuln.toolchain_mgr import run_toolchain_health, run_toolchain_maintenance
 from modules.vuln.nuclei_mgr import run_nuclei
+from modules.vuln.cve_mgr import run_cve_scan
 from modules.vuln.deep_scan_mgr import run_deep_scans
 from modules.vuln.js_deobf_mgr import run_js_deobfuscation_checks
 from utils.report_gen import generate_pdf_report
@@ -180,6 +182,7 @@ def main():
         ("Web Vulnerability Probes", lambda: run_web_probes(engine)),
         ("Misconfiguration Checks", lambda: run_misconfig_checks(target)),
         ("Classic Vuln Classes", lambda: run_classic_vuln_scans(engine)),
+        ("Authorization (IDOR/BOLA) Checks", lambda: run_authz_checks(engine)),
     ])
 
     # --- PHASE 2: DEEP SCAN ---
@@ -188,6 +191,8 @@ def main():
         ("Nuclei Findings", lambda: run_nuclei(target, severity=nuclei_severity)),
         ("JS Deobfuscation Checks", lambda: run_js_deobfuscation_checks(engine)),
     ]
+    if profile_cfg.get("enable_cve_scan", True):
+        phase2_tasks.append(("CVE Detection", lambda: run_cve_scan(engine, update_templates=update_toolchain)))
     if profile_cfg.get("enable_deep_scan", True):
         phase2_tasks.append(("Deep Scanner Findings", lambda: run_deep_scans(target, wordlist=wordlist)))
     if profile_cfg.get("enable_fuzzing", True):
@@ -221,6 +226,8 @@ def main():
         "crawler-enabled": bool(phase_map["Phase 0"].get("Crawler & JS Endpoints")),
         "vuln-classes": bool(phase_map["Phase 1"].get("Classic Vuln Classes")),
         "payload-fuzzing": bool(phase_map["Phase 2"].get("Payload Mutation Fuzzing")),
+        "authz-testing": cfg.get("auth", {}).get("enabled", False),
+        "cve-detection": bool(phase_map["Phase 2"].get("CVE Detection")),
         "toolchain-health": True,
         "stateful-scan": bool(state_file),
         "exports": bool(formats),

@@ -23,13 +23,15 @@ SOURCE_BONUS = {
     "Crawler & JS Endpoints": 2,
     "Cloud & Infra Checks": 4,
     "Toolchain Health": 1,
+    "Authorization (IDOR/BOLA) Checks": 8,
+    "CVE Detection": 7,
 }
 
 
 # Keyword patterns are matched on word boundaries so e.g. "rce" does not match
 # "resources" and "low" does not match "allow".
 SEVERITY_KEYWORDS = [
-    ("critical", ["critical", "takeover", "rce", "auth bypass", "data leak", "xxe", "request smuggling"]),
+    ("critical", ["critical", "takeover", "rce", "auth bypass", "broken authorization", "missing authentication", "idor", "bola", "data leak", "xxe", "request smuggling"]),
     ("high", ["high", "sqli", "xss", "ssrf", "vulnerable", "injection", "ssti", "lfi", "rfi"]),
     ("medium", ["medium", "misconfig", "misconfiguration", "outdated", "sensitive", "cors", "open redirect", "nosqli", "crlf"]),
     ("low", ["low", "info leak", "disclosure"]),
