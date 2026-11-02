@@ -7,9 +7,16 @@ ipinfo:
 settings:
   timeout: 10
   http_retries: 2
+  retry_backoff: 1.0       # exponential backoff factor; honours server Retry-After
   verify_tls: true
-  phase0_workers: 6        # parallel workers for Phase 0 recon (1 = serial)
-  user_agent: "Aura-Scanner/1.0 (National Security Audit)"
+  phase0_workers: 3        # parallel workers for Phase 0 recon (1 = serial, quietest)
+  # Low-noise defaults. A real browser UA (not "Aura-Scanner") avoids the obvious
+  # WAF block; pacing + jitter space out the Python requests.
+  user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+  request_delay: 0.0       # seconds between Python HTTP requests (global, 0 = off)
+  request_jitter: 0.25     # add random 0..N seconds per request to desynchronise
+  tool_rate_limit: 50      # req/s cap passed to nuclei/ffuf/sqlmap/dalfox (0 = tool default)
+  proxy: ""                # e.g. http://127.0.0.1:8080 -> routes Python + external tools (Burp)
 
 recon:
   google_dorks:

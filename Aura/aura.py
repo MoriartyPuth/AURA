@@ -38,6 +38,7 @@ from utils.state_store import load_state, save_state, mark_task_completed, is_ta
 from utils.checklist_gen import generate_checklists
 from utils.url_seeds import load_url_seeds
 from core.findings import coerce_list
+from core.http_utils import tool_footprint
 
 def print_banner():
     """Renders the custom AURA block-style logo."""
@@ -129,6 +130,7 @@ def main():
     parser.add_argument("--profile", default=None, help="Scan profile: quick|normal|deep")
     parser.add_argument("--maintenance", action="store_true", default=None, help="Run toolchain maintenance update tasks before scanning")
     parser.add_argument("--maintenance-only", action="store_true", help="Run maintenance and exit")
+    parser.add_argument("--proxy", default=None, help="Route Python + external-tool traffic through this proxy (e.g. http://127.0.0.1:8080)")
     args = parser.parse_args()
 
     os.makedirs("reports", exist_ok=True)
@@ -142,6 +144,8 @@ def main():
         scope_regex=args.scope_regex,
     )
     cfg = engine.config
+    if args.proxy is not None:
+        cfg.setdefault("settings", {})["proxy"] = args.proxy
     if not engine.scope.is_in_scope(target):
         Logger.error(f"Target {target} is outside the configured scope (include/exclude/regex). Aborting.")
         sys.exit(2)
@@ -175,7 +179,7 @@ def main():
 
     # Phase 0 is independent I/O-bound recon -> safe to parallelize. Phases 1 and 2
     # drive heavy external scanners (sqlmap, nuclei, ...) and stay serial by default.
-    phase0_workers = int(cfg.get("settings", {}).get("phase0_workers", 6))
+    phase0_workers = int(cfg.get("settings", {}).get("phase0_workers", 3))
 
     def run_group(name, tasks, workers=1):
         return run_group_with_progress(name, tasks, state, state_file, resume=resume, workers=workers)
@@ -214,13 +218,14 @@ def main():
     # --- PHASE 2: DEEP SCAN ---
     Logger.info("Phase 2: Launching deep vulnerability scans...")
     phase2_tasks = [
-        ("Nuclei Findings", lambda: run_nuclei(target, severity=nuclei_severity)),
+        ("Nuclei Findings", lambda: run_nuclei(target, severity=nuclei_severity, rate_limit=tool_footprint(cfg)["rate_limit"], proxy=tool_footprint(cfg)["proxy"])),
         ("JS Deobfuscation Checks", lambda: run_js_deobfuscation_checks(engine)),
     ]
     if profile_cfg.get("enable_cve_scan", True):
         phase2_tasks.append(("CVE Detection", lambda: run_cve_scan(engine, update_templates=update_toolchain)))
+    footprint = tool_footprint(cfg)
     if profile_cfg.get("enable_deep_scan", True):
-        phase2_tasks.append(("Deep Scanner Findings", lambda: run_deep_scans(target, wordlist=wordlist)))
+        phase2_tasks.append(("Deep Scanner Findings", lambda: run_deep_scans(target, wordlist=wordlist, rate_limit=footprint["rate_limit"], proxy=footprint["proxy"])))
     if profile_cfg.get("enable_fuzzing", True):
         phase2_tasks.append(("Payload Mutation Fuzzing", lambda: run_payload_mutation_fuzz(engine, load_url_seeds())))
     phase2 = run_group("Phase 2", phase2_tasks)

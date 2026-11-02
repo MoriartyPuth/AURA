@@ -10,6 +10,7 @@ import tempfile
 from urllib.parse import urlparse
 
 from core.logger import Logger
+from core.http_utils import tool_footprint
 from core.tool_runner import is_tool_available, run_command
 from utils.url_seeds import load_url_seeds
 
@@ -71,11 +72,16 @@ def parse_sqlmap_log(text):
     return results
 
 
-def _run_dalfox(url):
+def _run_dalfox(url, footprint):
     findings = []
     with tempfile.TemporaryDirectory(prefix="aura-dalfox-") as tmp:
         out_file = os.path.join(tmp, "dalfox.json")
         cmd = ["dalfox", "url", url, "--skip-bav", "--silence", "--no-color", "--format", "json", "-o", out_file]
+        if footprint.get("proxy"):
+            cmd += ["--proxy", footprint["proxy"]]
+        if footprint.get("rate_limit"):
+            # dalfox paces by delay (ms) + single worker; derive from the req/s cap.
+            cmd += ["--delay", str(int(1000 / footprint["rate_limit"])), "--worker", "1"]
         code, out, _ = run_command(cmd, timeout=300)
         text = open(out_file, encoding="utf-8").read() if os.path.exists(out_file) else out
     if code != 0:
@@ -92,10 +98,14 @@ def _run_dalfox(url):
     return findings
 
 
-def _run_sqlmap(url):
+def _run_sqlmap(url, footprint):
     findings = []
     with tempfile.TemporaryDirectory(prefix="aura-sqlmap-") as tmp:
         cmd = ["sqlmap", "-u", url, "--batch", "--level", "1", "--risk", "1", "--output-dir", tmp, "--disable-coloring"]
+        if footprint.get("proxy"):
+            cmd += ["--proxy", footprint["proxy"]]
+        if footprint.get("rate_limit"):
+            cmd += ["--delay", str(round(1 / footprint["rate_limit"], 2))]  # seconds between requests
         code, _, _ = run_command(cmd, timeout=600)
         logs = glob.glob(os.path.join(tmp, "*", "log"))
         text = "\n".join(open(p, encoding="utf-8", errors="replace").read() for p in logs)
@@ -109,6 +119,7 @@ def _run_sqlmap(url):
 def run_web_probes(engine):
     findings = []
     max_urls = int(engine.config.get("tuning", {}).get("probes", {}).get("max_urls", 3))
+    footprint = tool_footprint(engine.config)
     probes = [
         ("dalfox", "XSS", "q=test", _run_dalfox),
         ("sqlmap", "SQLi", "id=1", _run_sqlmap),
@@ -119,7 +130,7 @@ def run_web_probes(engine):
             continue
         for url in select_probe_urls(engine, fallback_query, max_urls):
             Logger.info(f"Phase 1: {label} probe with {tool_name} -> {url}")
-            for finding in runner(url):
+            for finding in runner(url, footprint):
                 Logger.critical(finding)
                 findings.append(finding)
     return findings

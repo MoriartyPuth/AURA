@@ -7,7 +7,7 @@ from core.tool_runner import is_tool_available, run_command
 NUCLEI_OUT = "reports/nuclei_raw.json"
 
 
-def run_nuclei(target, severity="high,critical"):
+def run_nuclei(target, severity="high,critical", rate_limit=0, proxy=""):
     findings = []
     if not is_tool_available("nuclei"):
         Logger.warn("nuclei not found. Skipping.")
@@ -16,6 +16,10 @@ def run_nuclei(target, severity="high,critical"):
     if os.path.exists(NUCLEI_OUT):
         os.remove(NUCLEI_OUT)  # never report stale results from a previous run
     cmd = ["nuclei", "-u", target, "-severity", severity, "-jsonl", "-o", NUCLEI_OUT, "-silent"]
+    if rate_limit:
+        cmd += ["-rl", str(rate_limit)]  # requests/sec cap
+    if proxy:
+        cmd += ["-proxy", proxy]
     code, _, err = run_command(cmd, timeout=1800)
     if code != 0:
         Logger.warn(f"nuclei returned non-zero: {err}")
