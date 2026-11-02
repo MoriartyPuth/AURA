@@ -8,6 +8,7 @@ settings:
   timeout: 10
   http_retries: 2
   verify_tls: true
+  phase0_workers: 6        # parallel workers for Phase 0 recon (1 = serial)
   user_agent: "Aura-Scanner/1.0 (National Security Audit)"
 
 recon:

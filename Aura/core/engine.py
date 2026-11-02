@@ -1,4 +1,5 @@
 import os
+import threading
 from urllib.parse import urlparse
 
 import yaml
@@ -12,6 +13,8 @@ class AuraEngine:
         self.domain = self.extract_domain(target)
         self.config = self.load_config()
         self._cache = {}
+        self._cache_locks = {}
+        self._cache_guard = threading.Lock()
         cfg_scope = self.config.get("scope", {})
         self.scope = ScopeManager(
             self.domain,
@@ -28,9 +31,16 @@ class AuraEngine:
         return {}
 
     def cached(self, key, producer):
-        """Run an expensive collector (e.g. subfinder, gau) once per scan and reuse the result."""
-        if key not in self._cache:
-            self._cache[key] = producer()
+        """Run an expensive collector (e.g. subfinder, gau) once per scan and reuse the
+        result. Thread-safe: a per-key lock means concurrent Phase 0 tasks that share a
+        collector run it once and the others wait for that result rather than re-running."""
+        if key in self._cache:
+            return self._cache[key]
+        with self._cache_guard:
+            lock = self._cache_locks.setdefault(key, threading.Lock())
+        with lock:
+            if key not in self._cache:
+                self._cache[key] = producer()
         return self._cache[key]
 
     @staticmethod
