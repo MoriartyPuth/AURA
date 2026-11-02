@@ -16,6 +16,21 @@ module:
    are covered.
 3. Runs nuclei's `cve` and `vulnerabilities` tagged templates at **all
    severities** and reports each unique CVE id with its severity and location.
+4. **Enriches** each match (`modules/vuln/exploit_refs.py`) with a `[VERIFIED]`
+   tag (a nuclei match is a non-destructive proof the target responds as
+   vulnerable), the CVSS score/vector, CWE, reference links (exploit/PoC
+   sources first), and the local lookup commands (`searchsploit`, `msfconsole
+   search cve:`) an operator runs to retrieve the public exploit. Full details
+   are written to `reports/cve_details.json`.
+
+### A note on exploitation
+
+AURA confirms and documents vulnerabilities; it does **not** launch exploits.
+A nuclei template match is safe verification (it checks the response, it does
+not deliver a weaponized payload). The enrichment gives an operator everything
+needed to exploit a finding - which CVE, that it is really present, and the
+exact exploit/lookup command - but running that exploit is a deliberate, manual
+step the human performs against a target they are authorized to test.
 
 **Limitation:** coverage equals your installed nuclei templates. A CVE with no
 public nuclei template will not be matched automatically; the fingerprint output
