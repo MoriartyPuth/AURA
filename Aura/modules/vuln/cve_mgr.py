@@ -24,6 +24,7 @@ import re
 from core.http_utils import build_session
 from core.logger import Logger
 from core.tool_runner import is_tool_available, run_command
+from core.findings import Finding
 from modules.vuln.exploit_refs import build_cve_detail, format_finding
 
 NUCLEI_CVE_OUT = "reports/nuclei_cve.json"
@@ -107,9 +108,20 @@ def _run_nuclei_cves(engine, update_templates):
                 continue
             seen.add(detail["id"])
             details.append(detail)
-            finding = format_finding(detail)
-            Logger.critical(f"nuclei {finding}")
-            findings.append(finding)
+            Logger.critical(f"nuclei {format_finding(detail)}")
+            severity = detail["severity"].lower()
+            title = f"CVE {detail['id']}: {detail['name']}"
+            if detail.get("cvss_score"):
+                title += f" (CVSS {detail['cvss_score']})"
+            findings.append(Finding(
+                title=title,
+                severity=severity if severity in {"critical", "high", "medium", "low", "info"} else "info",
+                confidence="high", verified=True,
+                url=detail["matched_at"],
+                references=detail["references"],
+                extra={"cve": detail["id"], "cvss": detail.get("cvss_score"),
+                       "cwe": detail.get("cwe"), "lookup_commands": detail["lookup_commands"]},
+            ))
 
     # Structured details (references, CVSS, lookup commands) for the operator to
     # act on manually. Exploitation stays a human, authorized step.
