@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import threading
 
 from colorama import Fore, Style
 from core.logger import Logger
@@ -36,6 +37,7 @@ from utils.exporters import export_json, export_csv, export_sarif
 from utils.state_store import load_state, save_state, mark_task_completed, is_task_completed, get_task_result
 from utils.checklist_gen import generate_checklists
 from utils.url_seeds import load_url_seeds
+from core.findings import coerce_list
 
 def print_banner():
     """Renders the custom AURA block-style logo."""
@@ -58,37 +60,57 @@ def print_banner():
     print(banner)
 
 
-def run_group_with_progress(group_name, tasks, state, state_file, resume=False):
+def run_group_with_progress(group_name, tasks, state, state_file, resume=False, workers=1):
+    """Run a phase's tasks, checkpointing each. With workers>1 the tasks run
+    concurrently in a thread pool (they are independent I/O-bound collectors);
+    results keep the original task order regardless of completion order."""
     results = {}
+    state_lock = threading.Lock()
 
     def _run_task(label, fn):
         if resume and is_task_completed(state, group_name, label):
             Logger.warn(f"{group_name}: reusing checkpointed result -> {label}")
-            return get_task_result(state, group_name, label)
+            return coerce_list(get_task_result(state, group_name, label), source=label, phase=group_name)
         try:
             output = fn()
         except Exception as ex:
             Logger.error(f"{label} failed: {ex}")
             output = []
-        mark_task_completed(state, group_name, label, output)
-        save_state(state_file, state)
-        return output
+        findings = coerce_list(output, source=label, phase=group_name)
+        with state_lock:  # state dict + file write are shared across worker threads
+            mark_task_completed(state, group_name, label, findings)
+            save_state(state_file, state)
+        return findings
 
     try:
         from alive_progress import alive_bar
     except ImportError:
         alive_bar = None
 
-    if alive_bar is None:
-        for label, fn in tasks:
-            results[label] = _run_task(label, fn)
-        return results
-
-    with alive_bar(len(tasks), title=group_name, force_tty=True) as bar:
-        for label, fn in tasks:
-            results[label] = _run_task(label, fn)
+    def _advance(bar):
+        if bar:
             bar()
-    return results
+
+    def _run(bar=None):
+        if workers and workers > 1 and len(tasks) > 1:
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            Logger.info(f"{group_name}: running {len(tasks)} tasks with {workers} workers.")
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = {pool.submit(_run_task, label, fn): label for label, fn in tasks}
+                for future in as_completed(futures):
+                    results[futures[future]] = future.result()
+                    _advance(bar)
+        else:
+            for label, fn in tasks:
+                results[label] = _run_task(label, fn)
+                _advance(bar)
+        # Restore original task order for stable, readable reports.
+        return {label: results[label] for label, _ in tasks}
+
+    if alive_bar is None:
+        return _run()
+    with alive_bar(len(tasks), title=group_name, force_tty=True) as bar:
+        return _run(bar)
 
 
 def main():
@@ -151,8 +173,12 @@ def main():
         if args.maintenance_only:
             return
 
-    def run_group(name, tasks):
-        return run_group_with_progress(name, tasks, state, state_file, resume=resume)
+    # Phase 0 is independent I/O-bound recon -> safe to parallelize. Phases 1 and 2
+    # drive heavy external scanners (sqlmap, nuclei, ...) and stay serial by default.
+    phase0_workers = int(cfg.get("settings", {}).get("phase0_workers", 6))
+
+    def run_group(name, tasks, workers=1):
+        return run_group_with_progress(name, tasks, state, state_file, resume=resume, workers=workers)
 
     # --- PHASE 0: RECON ---
     Logger.info("Phase 0: Reconnaissance & attack surface discovery...")
@@ -171,7 +197,7 @@ def main():
         phase0_tasks.insert(5, ("Crawler & JS Endpoints", lambda: run_crawler_pipeline(engine, max_pages=crawler_max_pages)))
     if profile_cfg.get("enable_toolchain_health", True):
         phase0_tasks.append(("Toolchain Health", lambda: run_toolchain_health(engine, update_templates=update_toolchain)))
-    phase0 = run_group("Phase 0", phase0_tasks)
+    phase0 = run_group("Phase 0", phase0_tasks, workers=phase0_workers)
 
     # --- PHASE 1: IDENTITY AUDIT ---
     Logger.info(f"Phase 1: Auditing Identity & Logic for {target}...")

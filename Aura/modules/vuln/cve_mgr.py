@@ -24,8 +24,11 @@ import re
 from core.http_utils import build_session
 from core.logger import Logger
 from core.tool_runner import is_tool_available, run_command
+from core.findings import Finding
+from modules.vuln.exploit_refs import build_cve_detail, format_finding
 
 NUCLEI_CVE_OUT = "reports/nuclei_cve.json"
+CVE_DETAILS_OUT = "reports/cve_details.json"
 # Headers that commonly leak a product and sometimes a version.
 _FINGERPRINT_HEADERS = ["Server", "X-Powered-By", "X-AspNet-Version", "X-Generator", "Via", "X-Runtime"]
 _VERSION_RE = re.compile(r"[\w.-]+/\d[\w.-]*")
@@ -93,26 +96,37 @@ def _run_nuclei_cves(engine, update_templates):
     if not os.path.exists(NUCLEI_CVE_OUT):
         return []
 
-    findings, seen = [], set()
+    findings, details, seen = [], [], set()
     with open(NUCLEI_CVE_OUT, "r", encoding="utf-8") as f:
         for line in f:
             try:
                 rec = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            info = rec.get("info", {})
-            template_id = rec.get("template-id", "")
-            # Prefer the CVE id so scoring/dedup key on the CVE itself.
-            cve_ids = (info.get("classification", {}) or {}).get("cve-id") or []
-            cve = cve_ids[0] if cve_ids else template_id
-            if cve in seen:
+            detail = build_cve_detail(rec, engine.target)
+            if detail["id"] in seen:
                 continue
-            seen.add(cve)
-            severity = (info.get("severity") or "unknown").upper()
-            name = info.get("name", template_id)
-            matched = rec.get("matched-at", engine.target)
-            Logger.critical(f"nuclei CVE [{severity}] {cve}: {name} @ {matched}")
-            findings.append(f"CVE {cve} [{severity}]: {name} ({matched})")
+            seen.add(detail["id"])
+            details.append(detail)
+            Logger.critical(f"nuclei {format_finding(detail)}")
+            severity = detail["severity"].lower()
+            title = f"CVE {detail['id']}: {detail['name']}"
+            if detail.get("cvss_score"):
+                title += f" (CVSS {detail['cvss_score']})"
+            findings.append(Finding(
+                title=title,
+                severity=severity if severity in {"critical", "high", "medium", "low", "info"} else "info",
+                confidence="high", verified=True,
+                url=detail["matched_at"],
+                references=detail["references"],
+                extra={"cve": detail["id"], "cvss": detail.get("cvss_score"),
+                       "cwe": detail.get("cwe"), "lookup_commands": detail["lookup_commands"]},
+            ))
+
+    # Structured details (references, CVSS, lookup commands) for the operator to
+    # act on manually. Exploitation stays a human, authorized step.
+    with open(CVE_DETAILS_OUT, "w", encoding="utf-8") as f:
+        json.dump({"target": engine.target, "cves": details}, f, indent=2)
     return findings
 
 

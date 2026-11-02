@@ -1,6 +1,7 @@
 import re
 
-from utils.common import normalize_key, strip_confidence_tag
+from core.findings import coerce_phase_map
+from utils.common import normalize_key
 
 
 SEVERITY_SCORES = {
@@ -42,41 +43,51 @@ SEVERITY_PATTERNS = [
 ]
 
 # Tool-verified findings (e.g. sqlmap-confirmed injection) outrank heuristic ones.
-CONFIRMED_RE = re.compile(r"\bconfirmed\b", re.IGNORECASE)
+CONFIRMED_RE = re.compile(r"\b(confirmed|verified)\b", re.IGNORECASE)
 CONFIRMED_BONUS = 10
 
 
 def infer_severity(text):
-    # Ignore the quality gate's "[HIGH]/[MEDIUM]/[LOW]" confidence tag: it is not a severity.
-    t = strip_confidence_tag(text)
     for severity, pattern in SEVERITY_PATTERNS:
-        if pattern.search(t):
+        if pattern.search(text or ""):
             return severity
     return "info"
 
 
+def severity_of(finding):
+    """Explicit finding.severity wins; otherwise infer from the title."""
+    sev = (finding.severity or "").lower()
+    if sev in SEVERITY_SCORES:
+        return sev
+    return infer_severity(finding.title)
+
+
 def build_risk_table(phase_map):
+    phase_map = coerce_phase_map(phase_map)
     dedup = {}
 
     for phase, modules in phase_map.items():
         if not isinstance(modules, dict):
             continue
         for source, entries in modules.items():
-            for entry in entries or []:
-                severity = infer_severity(entry)
+            for f in entries or []:
+                severity = severity_of(f)
                 score = SEVERITY_SCORES[severity] + SOURCE_BONUS.get(source, 0)
-                if CONFIRMED_RE.search(entry):
+                if f.verified or CONFIRMED_RE.search(f.title):
                     score += CONFIRMED_BONUS
-                key = normalize_key(entry, strip_ips=True)
+                key = normalize_key(f.title, strip_ips=True)
                 item = {
                     "severity": severity.upper(),
                     "score": score,
                     "phase": phase,
                     "source": source,
-                    "finding": entry,
+                    "finding": f.title,
+                    "confidence": f.confidence or "",
+                    "url": f.url,
+                    "verified": f.verified,
+                    "references": f.references,
                 }
                 if key not in dedup or item["score"] > dedup[key]["score"]:
                     dedup[key] = item
 
-    table = sorted(dedup.values(), key=lambda x: x["score"], reverse=True)
-    return table
+    return sorted(dedup.values(), key=lambda x: x["score"], reverse=True)

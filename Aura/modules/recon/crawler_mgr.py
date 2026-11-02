@@ -6,7 +6,7 @@ from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 
 from core.logger import Logger
-from core.http_utils import build_session
+from core.http_utils import auth_headers, build_authed_session
 
 
 def _extract_js_endpoints(js_text):
@@ -28,7 +28,12 @@ def run_crawler_pipeline(engine, max_pages=25):
     discovered_endpoints = set()
     param_urls = set()  # links with query strings: seeds for probes/fuzzing
 
-    session = build_session(engine.config)
+    # Crawl as the victim account when auth is configured, so the post-login
+    # surface is discovered and fed to the probes/fuzzer/authz checks downstream.
+    session = build_authed_session(engine.config, "victim")
+    authed = bool(auth_headers(engine.config, "victim"))
+    if authed:
+        Logger.info("Crawler: authenticated crawl using the victim account.")
 
     while queued and len(seen_pages) < max_pages:
         current = queued.popleft()
@@ -45,7 +50,10 @@ def run_crawler_pipeline(engine, max_pages=25):
 
         soup = BeautifulSoup(r.text, "html.parser")
         for a in soup.find_all("a", href=True):
-            candidate = urljoin(current, a["href"])
+            href = a["href"]
+            if authed and any(w in href.lower() for w in ("logout", "signout", "sign-out", "log-out")):
+                continue  # following a logout link would kill the authenticated session
+            candidate = urljoin(current, href)
             if engine.scope.is_in_scope(candidate):
                 parsed = urlparse(candidate)
                 clean = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
@@ -83,5 +91,7 @@ def run_crawler_pipeline(engine, max_pages=25):
     for endpoint in sorted(discovered_endpoints):
         findings.append(f"JS Endpoint: {endpoint}")
 
-    Logger.success(f"Crawler: pages={len(seen_pages)} js_endpoints={len(discovered_endpoints)}")
+    mode = "authenticated" if authed else "unauthenticated"
+    findings.insert(0, f"Crawl mode: {mode} ({len(seen_pages)} pages, {len(discovered_endpoints)} JS endpoints)")
+    Logger.success(f"Crawler: {mode} pages={len(seen_pages)} js_endpoints={len(discovered_endpoints)}")
     return findings

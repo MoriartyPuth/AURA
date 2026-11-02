@@ -9,7 +9,7 @@ class TestFindingFilters(unittest.TestCase):
         cfg = {"tuning": {"ignore_finding_patterns": ["manual review"]}}
         filtered, meta = apply_finding_filters(phase_map, cfg)
         self.assertEqual(meta["filtered"], 1)
-        self.assertEqual(filtered["Phase 1"]["Classic"], ["confirmed leak"])
+        self.assertEqual([f.title for f in filtered["Phase 1"]["Classic"]], ["confirmed leak"])
 
 
 if __name__ == "__main__":
