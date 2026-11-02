@@ -25,6 +25,7 @@ Credentials are read from config/CLI only and never written to any report.
 from difflib import SequenceMatcher
 from urllib.parse import urlparse
 
+from core.findings import Finding
 from core.http_utils import build_session
 from core.logger import Logger
 from utils.url_seeds import load_url_seeds
@@ -116,13 +117,23 @@ def run_authz_checks(engine):
         a_status, a_body = _fetch(attacker_s, url)
         if _looks_authenticated(a_status, a_body) and _same_resource(v_body, a_body):
             Logger.critical(f"IDOR/BOLA: attacker account reads victim resource at {url}")
-            findings.append(f"BROKEN AUTHORIZATION (horizontal/IDOR): {url} - attacker account received the victim's resource")
+            findings.append(Finding(
+                title=f"Broken authorization (horizontal/IDOR): {url}",
+                severity="critical", confidence="high", verified=True, url=url,
+                evidence="Attacker account received a response matching the victim's resource.",
+                extra={"class": "idor", "victim_status": v_status, "attacker_status": a_status},
+            ))
             continue
 
         n_status, n_body = _fetch(anon_s, url)
         if _looks_authenticated(n_status, n_body) and _same_resource(v_body, n_body):
             Logger.critical(f"MISSING AUTH: unauthenticated request reads protected resource at {url}")
-            findings.append(f"MISSING AUTHENTICATION: {url} - unauthenticated request received the protected resource")
+            findings.append(Finding(
+                title=f"Missing authentication: {url}",
+                severity="critical", confidence="high", verified=True, url=url,
+                evidence="Unauthenticated request received the protected resource.",
+                extra={"class": "missing-auth", "victim_status": v_status, "anon_status": n_status},
+            ))
 
     Logger.success(f"Authz checks: tested {tested} authenticated endpoints, {len(findings)} findings")
     return findings

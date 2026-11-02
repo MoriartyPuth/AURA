@@ -36,6 +36,7 @@ from utils.exporters import export_json, export_csv, export_sarif
 from utils.state_store import load_state, save_state, mark_task_completed, is_task_completed, get_task_result
 from utils.checklist_gen import generate_checklists
 from utils.url_seeds import load_url_seeds
+from core.findings import coerce_list
 
 def print_banner():
     """Renders the custom AURA block-style logo."""
@@ -64,15 +65,16 @@ def run_group_with_progress(group_name, tasks, state, state_file, resume=False):
     def _run_task(label, fn):
         if resume and is_task_completed(state, group_name, label):
             Logger.warn(f"{group_name}: reusing checkpointed result -> {label}")
-            return get_task_result(state, group_name, label)
+            return coerce_list(get_task_result(state, group_name, label), source=label, phase=group_name)
         try:
             output = fn()
         except Exception as ex:
             Logger.error(f"{label} failed: {ex}")
             output = []
-        mark_task_completed(state, group_name, label, output)
+        findings = coerce_list(output, source=label, phase=group_name)
+        mark_task_completed(state, group_name, label, findings)
         save_state(state_file, state)
-        return output
+        return findings
 
     try:
         from alive_progress import alive_bar

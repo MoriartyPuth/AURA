@@ -1,6 +1,8 @@
 from datetime import datetime
 
 from fpdf import FPDF
+
+from core.findings import coerce_phase_map
 from fpdf.enums import XPos, YPos
 
 # Move to the start of the next line after each cell (fpdf2 defaults to staying on the same line).
@@ -24,8 +26,10 @@ def _render_phase(pdf, title, phase_data):
         pdf.set_font("helvetica", "", 10)
         if not entries:
             pdf.multi_cell(0, 7, "- No significant findings.", **NEXT_LINE)
-        for line in entries:
-            pdf.multi_cell(0, 7, f"- {line}", **NEXT_LINE)
+        for f in entries:
+            conf = f"[{f.confidence.upper()}] " if f.confidence else ""
+            tag = "[VERIFIED] " if f.verified else ""
+            pdf.multi_cell(0, 7, f"- {conf}{tag}{f.title}", **NEXT_LINE)
         pdf.ln(1)
 
     pdf.ln(4)
@@ -53,6 +57,11 @@ def _render_risk_table(pdf, risks, max_rows=25):
 
 
 def generate_pdf_report(target, phase0, phase1, phase2, risks, output_path):
+    phase0, phase1, phase2 = (
+        coerce_phase_map({"p": phase0})["p"],
+        coerce_phase_map({"p": phase1})["p"],
+        coerce_phase_map({"p": phase2})["p"],
+    )
     pdf = AuraReport()
     pdf.add_page()
     pdf.set_font("helvetica", "B", 12)

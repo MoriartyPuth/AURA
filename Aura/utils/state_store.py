@@ -26,7 +26,8 @@ def mark_task_completed(state, phase_name, task_name, result=None):
     done = state.setdefault("completed", {}).setdefault(phase_name, [])
     if task_name not in done:
         done.append(task_name)
-    state.setdefault("results", {}).setdefault(phase_name, {})[task_name] = result or []
+    serialized = [f.to_dict() if hasattr(f, "to_dict") else f for f in (result or [])]
+    state.setdefault("results", {}).setdefault(phase_name, {})[task_name] = serialized
 
 
 def is_task_completed(state, phase_name, task_name):

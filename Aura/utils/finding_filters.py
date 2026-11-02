@@ -1,7 +1,10 @@
 import re
 
+from core.findings import coerce_phase_map
+
 
 def apply_finding_filters(phase_map, config):
+    phase_map = coerce_phase_map(phase_map)
     tuning = (config or {}).get("tuning", {})
     patterns = tuning.get("ignore_finding_patterns", [])
     if not patterns:
@@ -20,10 +23,11 @@ def apply_finding_filters(phase_map, config):
         filtered[phase] = {}
         for source, entries in (modules or {}).items():
             kept = []
-            for entry in entries or []:
-                if any(c.search(entry or "") for c in compiled):
+            for f in entries or []:
+                haystack = f"{f.title} {f.evidence}"
+                if any(c.search(haystack) for c in compiled):
                     dropped += 1
                     continue
-                kept.append(entry)
+                kept.append(f)
             filtered[phase][source] = kept
     return filtered, {"filtered": dropped}

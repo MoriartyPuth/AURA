@@ -73,7 +73,9 @@ class TestAuthz(unittest.TestCase):
             attacker=FakeSession({url: FakeResp(200, VICTIM_BODY)}),  # same body -> IDOR
             anon=FakeSession({url: FakeResp(302, "")}),
         )
-        self.assertTrue(any("horizontal/IDOR" in f for f in findings))
+        self.assertTrue(any("horizontal/IDOR" in f.title for f in findings))
+        self.assertEqual(findings[0].severity, "critical")
+        self.assertTrue(findings[0].verified)
 
     def test_no_finding_when_attacker_gets_own_data(self):
         url = "https://app.test/api/account/1"
@@ -100,7 +102,7 @@ class TestAuthz(unittest.TestCase):
             attacker=FakeSession({url: FakeResp(403, "forbidden")}),
             anon=FakeSession({url: FakeResp(200, VICTIM_BODY)}),  # anon sees it
         )
-        self.assertTrue(any("MISSING AUTHENTICATION" in f for f in findings))
+        self.assertTrue(any("Missing authentication" in f.title for f in findings))
 
     def test_skips_when_disabled(self):
         self.assertEqual(authz_mgr.run_authz_checks(FakeEngine({"auth": {"enabled": False}})), [])
