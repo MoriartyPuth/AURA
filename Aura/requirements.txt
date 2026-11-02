@@ -1,10 +1,7 @@
 colorama
-tqdm
 alive-progress
 requests
-aiohttp
 beautifulsoup4
-fake-useragent
 pyjwt
 shodan
 mmh3
@@ -17,5 +14,5 @@ python3-nmap
 ipinfo
 ratelimit
 PyExecJS
-fpdf
+fpdf2
 pyyaml

@@ -1,31 +1,12 @@
 import os
 from core.logger import Logger
 from core.tool_runner import is_tool_available, run_command
-
-
-def _collect_subdomains(domain):
-    subs = set()
-    sources = [
-        ("subfinder", ["subfinder", "-silent", "-d", domain]),
-        ("assetfinder", ["assetfinder", "--subs-only", domain]),
-    ]
-    for tool_name, cmd in sources:
-        if not is_tool_available(tool_name):
-            continue
-        code, out, _ = run_command(cmd, timeout=120)
-        if code != 0:
-            continue
-        for line in out.splitlines():
-            sub = line.strip().lower()
-            if sub and domain in sub:
-                subs.add(sub)
-    return sorted(subs)
+from modules.recon.subdomain_mgr import collect_subdomains
 
 
 def run_takeover_checks(engine):
     findings = []
-    domain = engine.domain
-    subdomains = _collect_subdomains(domain)
+    subdomains = collect_subdomains(engine)
     if not subdomains:
         Logger.warn("Takeover checks skipped: no subdomains available.")
         return findings
@@ -52,9 +33,7 @@ def run_takeover_checks(engine):
 
     if is_tool_available("subjack"):
         Logger.info("Phase 1: running subjack takeover checks...")
-        fingerprints = ""
-        if engine.config:
-            fingerprints = engine.config.get("tools", {}).get("subjack_fingerprints", "")
+        fingerprints = engine.config.get("tools", {}).get("subjack_fingerprints", "")
 
         cmd = ["subjack", "-w", sub_file, "-ssl", "-timeout", "30", "-v"]
         if fingerprints:

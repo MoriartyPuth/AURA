@@ -79,7 +79,7 @@ Aura-Scanner uses Profiles to balance speed and depth. Choose the profile that m
 * **Usage:**
 
 ```
-python3 aura.py -u https://target.com --profile quick
+python3 aura.py -t https://target.com --profile quick
 ```
 
 2. The 'Normal' Profile (Default)
@@ -93,7 +93,7 @@ Best for: Standard security assessments and compliance checks.
 * **Usage:**
 
 ```
-python3 aura.py -u https://target.com --profile normal
+python3 aura.py -t https://target.com --profile normal
 ```
 3. The 'Deep' Profile
 
@@ -105,7 +105,7 @@ Best for: Full-scale penetration testing and red-teaming.
 
 * **Usage:**
 ```
-python3 aura.py -u https://target.com --profile deep --export pdf
+python3 aura.py -t https://target.com --profile deep
 ```
 
 ---
@@ -119,7 +119,6 @@ ipinfo:
   token: "YOUR_IPINFO_TOKEN"
 
 settings:
-  threads: 25              # Concurrent audit workers
   timeout: 10              # Network timeout (seconds)
   user_agent: "YOUR_NAME"
 ```

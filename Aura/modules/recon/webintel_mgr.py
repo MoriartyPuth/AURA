@@ -8,25 +8,13 @@ from core.logger import Logger
 from core.http_utils import build_session
 
 
-def _get_user_agent(engine):
-    configured = (engine.config or {}).get("settings", {}).get("user_agent")
-    if configured:
-        return configured
-    try:
-        from fake_useragent import UserAgent
-        return UserAgent().random
-    except Exception:
-        return "Aura-Scanner/1.0"
-
-
 def run_web_intel(engine):
     findings = []
     session = build_session(engine.config)
-    headers = {"User-Agent": _get_user_agent(engine)}
     target = engine.target
 
     try:
-        r = session.get(target, headers=headers, timeout=session._aura_timeout)
+        r = session.get(target)
         findings.append(f"HTTP Status: {r.status_code}")
 
         soup = BeautifulSoup(r.text, "html.parser")
@@ -42,7 +30,7 @@ def run_web_intel(engine):
             favicon_href = "/favicon.ico"
 
         favicon_url = urljoin(target + "/", favicon_href)
-        fav = session.get(favicon_url, headers=headers, timeout=session._aura_timeout)
+        fav = session.get(favicon_url)
         if fav.ok and fav.content:
             b64 = base64.b64encode(fav.content)
             hash_val = mmh3.hash(b64)

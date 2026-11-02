@@ -15,10 +15,9 @@ def _inject_param(url, param, value):
 
 def run_payload_mutation_fuzz(engine, seed_urls):
     findings = []
-    headers = {"User-Agent": (engine.config or {}).get("settings", {}).get("user_agent", "Aura-Scanner/1.0")}
     session = build_session(engine.config)
     mutations = load_mutations(engine.config)
-    fuzz_cfg = (engine.config or {}).get("tuning", {}).get("fuzz", {})
+    fuzz_cfg = engine.config.get("tuning", {}).get("fuzz", {})
     max_urls = int(fuzz_cfg.get("max_seed_urls", 50))
     max_params = int(fuzz_cfg.get("max_params_per_url", 5))
 
@@ -33,7 +32,7 @@ def run_payload_mutation_fuzz(engine, seed_urls):
                     if not engine.scope.is_in_scope(test_url):
                         continue
                     try:
-                        r = session.get(test_url, timeout=session._aura_timeout, headers=headers)
+                        r = session.get(test_url)
                     except Exception:
                         continue
                     body = (r.text or "").lower()

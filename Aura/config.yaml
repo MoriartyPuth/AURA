@@ -5,7 +5,6 @@ ipinfo:
   token: "YOUR_IPINFO_TOKEN"
 
 settings:
-  threads: 20
   timeout: 10
   http_retries: 2
   verify_tls: true

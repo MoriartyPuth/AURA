@@ -2,19 +2,26 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+DEFAULT_USER_AGENT = "Aura-Scanner/1.0"
 
-def get_http_settings(config):
-    settings = (config or {}).get("settings", {})
-    timeout = int(settings.get("timeout", 10))
-    verify_tls = bool(settings.get("verify_tls", True))
-    retries = int(settings.get("http_retries", 2))
-    user_agent = settings.get("user_agent", "Aura-Scanner/1.0")
-    return timeout, verify_tls, retries, user_agent
+
+class AuraSession(requests.Session):
+    """requests.Session that applies the configured timeout to every request."""
+
+    def __init__(self, timeout):
+        super().__init__()
+        self.default_timeout = timeout
+
+    def request(self, method, url, **kwargs):
+        kwargs.setdefault("timeout", self.default_timeout)
+        return super().request(method, url, **kwargs)
 
 
 def build_session(config):
-    timeout, verify_tls, retries, user_agent = get_http_settings(config)
-    session = requests.Session()
+    settings = (config or {}).get("settings", {})
+    retries = int(settings.get("http_retries", 2))
+
+    session = AuraSession(timeout=int(settings.get("timeout", 10)))
     retry = Retry(
         total=retries,
         connect=retries,
@@ -26,7 +33,6 @@ def build_session(config):
     adapter = HTTPAdapter(max_retries=retry)
     session.mount("http://", adapter)
     session.mount("https://", adapter)
-    session.headers.update({"User-Agent": user_agent})
-    session.verify = verify_tls
-    session._aura_timeout = timeout
+    session.headers.update({"User-Agent": settings.get("user_agent", DEFAULT_USER_AGENT)})
+    session.verify = bool(settings.get("verify_tls", True))
     return session

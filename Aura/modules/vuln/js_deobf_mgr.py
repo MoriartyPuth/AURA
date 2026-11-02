@@ -8,10 +8,9 @@ def run_js_deobfuscation_checks(engine):
     findings = []
     target = engine.target
     session = build_session(engine.config)
-    headers = {"User-Agent": (engine.config or {}).get("settings", {}).get("user_agent", "Aura-Scanner/1.0")}
 
     try:
-        r = session.get(target, timeout=session._aura_timeout, headers=headers)
+        r = session.get(target)
         soup = BeautifulSoup(r.text, "html.parser")
         inline_scripts = [s.get_text() for s in soup.find_all("script") if s.get_text(strip=True)]
     except Exception as ex:

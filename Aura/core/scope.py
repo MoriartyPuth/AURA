@@ -2,6 +2,10 @@ import re
 from urllib.parse import urlparse
 
 
+def _matches(host, domain):
+    return host == domain or host.endswith(f".{domain}")
+
+
 class ScopeManager:
     def __init__(self, base_domain, include_domains=None, exclude_domains=None, scope_regex=None):
         self.base_domain = (base_domain or "").lower()
@@ -9,27 +13,20 @@ class ScopeManager:
         self.exclude_domains = [d.lower() for d in (exclude_domains or []) if d]
         self.scope_re = re.compile(scope_regex) if scope_regex else None
 
-    def _extract_domain(self, value):
-        parsed = urlparse(value)
-        host = (parsed.netloc or value).split("/")[0].lower()
-        return host
+    @staticmethod
+    def _extract_host(value):
+        parsed = urlparse(value if "//" in value else f"//{value}")
+        return (parsed.hostname or "").lower()
 
     def is_in_scope(self, value):
-        host = self._extract_domain(value)
+        host = self._extract_host(value)
         if not host:
             return False
-
-        if self.exclude_domains and any(host == d or host.endswith(f".{d}") for d in self.exclude_domains):
+        if any(_matches(host, d) for d in self.exclude_domains):
             return False
-
-        if self.include_domains:
-            if not any(host == d or host.endswith(f".{d}") for d in self.include_domains):
-                return False
-        else:
-            if self.base_domain and not (host == self.base_domain or host.endswith(f".{self.base_domain}")):
-                return False
-
+        allowed = self.include_domains or ([self.base_domain] if self.base_domain else [])
+        if allowed and not any(_matches(host, d) for d in allowed):
+            return False
         if self.scope_re and not self.scope_re.search(value):
             return False
-
         return True
