@@ -36,6 +36,7 @@ from utils.finding_filters import apply_finding_filters
 from utils.exporters import export_json, export_csv, export_sarif
 from utils.state_store import load_state, save_state, mark_task_completed, is_task_completed, get_task_result
 from utils.checklist_gen import generate_checklists
+from utils.cli_summary import print_summary
 from utils.url_seeds import load_url_seeds
 from core.findings import coerce_list
 from core.http_utils import tool_footprint
@@ -118,7 +119,9 @@ def main():
     # CLI flags left unset (None) fall back to config.yaml, then to built-in defaults.
     parser = argparse.ArgumentParser(description="Aura-Scanner: Professional Security Auditor")
     parser.add_argument("-t", "--target", required=True, help="Target URL (e.g. https://example.com)")
-    parser.add_argument("-o", "--output", default="reports/audit_report.pdf", help="Output PDF path")
+    parser.add_argument("--pdf", action="store_true", default=None, help="Also generate the PDF report (off by default)")
+    parser.add_argument("-o", "--output", default=None, help="PDF report path (implies --pdf; default reports/audit_report.pdf)")
+    parser.add_argument("--show-info", action="store_true", help="List INFO-level entries in the terminal summary too")
     parser.add_argument("--include-domain", action="append", default=[], help="Additional in-scope domain (repeatable)")
     parser.add_argument("--exclude-domain", action="append", default=[], help="Out-of-scope domain (repeatable)")
     parser.add_argument("--scope-regex", default=None, help="Regex that URLs must match to stay in scope")
@@ -237,12 +240,18 @@ def main():
     risk_table = build_risk_table(phase_map)
 
     # --- PHASE 3: REPORTING ---
-    Logger.info("Phase 3: Compiling Final Audit Report (PDF)...")
-    try:
-        generate_pdf_report(target, phase_map["Phase 0"], phase_map["Phase 1"], phase_map["Phase 2"], risk_table, args.output)
-        Logger.success(f"Audit Complete. Final Report generated at: {args.output}")
-    except Exception as e:
-        Logger.error(f"Report Generation Failed: {e}")
+    # Findings go to the terminal first; the PDF is opt-in (--pdf / -o / exports.pdf).
+    print_summary(target, risk_table, show_info=args.show_info)
+
+    want_pdf = bool(args.output) or bool(setting(args.pdf, "exports", "pdf", False))
+    if want_pdf:
+        pdf_path = args.output or "reports/audit_report.pdf"
+        Logger.info("Phase 3: Compiling Final Audit Report (PDF)...")
+        try:
+            generate_pdf_report(target, phase_map["Phase 0"], phase_map["Phase 1"], phase_map["Phase 2"], risk_table, pdf_path)
+            Logger.success(f"PDF report generated at: {pdf_path}")
+        except Exception as e:
+            Logger.error(f"Report Generation Failed: {e}")
 
     formats = {x.strip().lower() for x in export_formats.split(",") if x.strip()}
     if "json" in formats:

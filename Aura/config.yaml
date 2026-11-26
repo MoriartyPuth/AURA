@@ -54,6 +54,7 @@ state:
 
 exports:
   formats: "json,csv,sarif"
+  pdf: false               # true = always write the PDF report (or pass --pdf / -o)
 
 quality:
   min_confidence: "medium"
