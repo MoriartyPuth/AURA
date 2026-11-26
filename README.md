@@ -42,11 +42,11 @@ External tools are optional — any that are missing are skipped: `subfinder ass
 
 ## Audit Lifecycle
 
-**Phase 0 — Recon.** OSINT (crt.sh, Shodan InternetDB — keyless ports/CVEs, Wayback/gau, WHOIS/DNS, favicon hash) plus active discovery (naabu/nmap, httpx, arjun, subfinder, in-scope crawler with JS endpoint extraction). Runs in parallel. With an `auth:` block the crawler runs authenticated, feeding the post-login surface to later phases. Optional S3/GCS/Azure bucket probes (opt-out).
+**Phase 0 — Recon.** OSINT (crt.sh, Shodan InternetDB — keyless ports/CVEs, Wayback/gau, WHOIS/DNS, favicon hash) plus active discovery (naabu top-1000 → nmap `-sV` on just the open ports, httpx, arjun, subfinder, in-scope crawler with JS endpoint extraction). A port in the target URL is always scanned. Runs in parallel. With an `auth:` block the crawler runs authenticated, feeding the post-login surface to later phases. Optional S3/GCS/Azure bucket probes (opt-out).
 
 **Phase 1 — Identity, logic & misconfig.** Sensitive-path probing with soft-404 filtering; JWT discovery + `alg=none`; sqlmap/dalfox on real parameterised URLs; SSTI/LFI/XXE/CRLF/CORS/open-redirect/smuggling checks; subzy/subjack takeover. **Authz (opt-in):** replays in-scope endpoints across victim/attacker/anonymous (and admin) accounts to find IDOR/BOLA, missing-auth and privilege escalation. GET-only, never mutates, creds never written to reports.
 
-**Phase 2 — Vuln orchestration.** nuclei at the profile's severity; CVE detection (header + whatweb fingerprint → nuclei `cve` templates, enriched with CVSS, PoC links and `searchsploit`/`msfconsole` lookups in `reports/cve_details.json`); ffuf (auto-calibrated) + wapiti; payload mutation fuzzing. AURA confirms and documents — it never launches exploits.
+**Phase 2 — Vuln orchestration.** One nuclei pass at the profile's severity; any CVE-tagged hit is enriched in place with CVSS, PoC links and `searchsploit`/`msfconsole` lookups (`reports/cve_details.json`), plus header/`whatweb` stack fingerprinting; ffuf (auto-calibrated) + wapiti; payload mutation fuzzing. AURA confirms and documents — it never launches exploits.
 
 **Phase 3 — Quality gate & reporting.** Confidence gate (drops anything below `--min-confidence`, default `medium`), dedup + severity scoring (tool-confirmed outranks heuristic), then terminal summary + PDF/JSON/CSV/SARIF.
 

@@ -3,7 +3,7 @@ import os
 import sys
 import threading
 
-from colorama import Fore, Style
+from colorama import Fore
 from core.logger import Logger
 from core.engine import AuraEngine
 from modules.recon.osint_mgr import run_osint_discovery
@@ -40,11 +40,6 @@ from utils.cli_summary import print_summary
 from utils.url_seeds import load_url_seeds
 from core.findings import coerce_list
 from core.http_utils import tool_footprint
-from core.tool_runner import is_tool_available, run_command
-
-def run_toolchain_maintenance_nuclei():
-    if is_tool_available("nuclei"):
-        run_command(["nuclei", "-update-templates"], timeout=300)
 
 
 def print_banner():
@@ -228,19 +223,15 @@ def main():
 
     # --- PHASE 2: DEEP SCAN ---
     Logger.info("Phase 2: Launching deep vulnerability scans...")
-    # With parallel Phase 2 the CVE task must not rewrite nuclei templates while the
-    # main nuclei run reads them, so update once up front instead.
-    cve_update = update_toolchain
-    if update_toolchain and phase2_workers > 1 and profile_cfg.get("enable_cve_scan", True):
-        Logger.info("Updating nuclei templates before parallel Phase 2...")
-        run_toolchain_maintenance_nuclei()
-        cve_update = False
+    # One nuclei pass at the profile severity enriches CVE hits from the same run,
+    # so there is no second nuclei process to coordinate templates with.
     phase2_tasks = [
-        ("Nuclei Findings", lambda: run_nuclei(target, severity=nuclei_severity, rate_limit=tool_footprint(cfg)["rate_limit"], proxy=tool_footprint(cfg)["proxy"])),
+        ("Nuclei Findings", lambda: run_nuclei(engine, severity=nuclei_severity, update_templates=update_toolchain)),
         ("JS Deobfuscation Checks", lambda: run_js_deobfuscation_checks(engine)),
     ]
     if profile_cfg.get("enable_cve_scan", True):
-        phase2_tasks.append(("CVE Detection", lambda: run_cve_scan(engine, update_templates=cve_update)))
+        # Stack fingerprinting only; CVE matching happens in the nuclei pass above.
+        phase2_tasks.append(("CVE Detection", lambda: run_cve_scan(engine)))
     footprint = tool_footprint(cfg)
     if profile_cfg.get("enable_deep_scan", True):
         phase2_tasks.append(("Deep Scanner Findings", lambda: run_deep_scans(target, wordlist=wordlist, rate_limit=footprint["rate_limit"], proxy=footprint["proxy"])))

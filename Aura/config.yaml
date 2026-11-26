@@ -13,6 +13,7 @@ settings:
   retry_backoff: 1.0       # exponential backoff factor; honours server Retry-After
   verify_tls: true
   phase0_workers: 3        # parallel workers for Phase 0 recon (1 = serial, quietest)
+  naabu_ports: ""          # naabu scan range; "" = top 1000. e.g. "1-65535" (full) or "80,443,8080"
   phase1_workers: 3        # parallel Phase 1 tasks (probes, takeover, authz, ...)
   phase2_workers: 2        # parallel Phase 2 tasks (nuclei, CVE scan, ffuf/wapiti, fuzzing)
   http_workers: 8          # concurrent Python HTTP requests per module (paths, buckets, crawler, authz)
