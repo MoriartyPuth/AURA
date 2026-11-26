@@ -9,6 +9,8 @@
 
 A phase-based web audit orchestrator. It wraps the recon/vuln toolchain (nuclei, httpx, naabu, sqlmap, dalfox, ffuf, …), turns the raw output into deduped, severity-scored findings, and prints them to your terminal — so you can skip the busywork and go straight to manual exploitation.
 
+Its standout is **automated broken-access-control testing**: give it two accounts and it hunts IDOR / BOLA and privilege escalation end to end — discover the API surface → harvest the owner's real ids → replay every endpoint across accounts. Everything else (CVEs, misconfig, takeover, injection, recon) runs point-and-go with no accounts.
+
 ---
 
 ## See it work
@@ -51,6 +53,31 @@ External tools are optional — any that are missing are skipped: `subfinder ass
 | `--profile quick` | 2–5 min | Recon + Phase 1 + critical-severity nuclei. No crawler/ffuf/wapiti/fuzzing. |
 | `--profile normal` *(default)* | 10–20 min | All phases: crawler (25p), sqlmap/dalfox, high+critical nuclei, ffuf, fuzzing. |
 | `--profile deep` | 60+ min | Normal + deeper crawl (60p), medium+ nuclei, larger ffuf wordlist. |
+
+---
+
+## Access-control testing (IDOR / BOLA)
+
+The access-control hunter is **opt-in** and needs real sessions — you can't test "can A read B's data?" anonymously. Log in yourself, grab each account's session header, and drop them in `config.yaml`:
+
+```yaml
+auth:
+  enabled: true
+  victim:                                                  # owns the resources
+    headers: { Authorization: "Bearer <victim-token>" }    #   or Cookie: "session=…"
+  attacker:                                                # a different low-priv user
+    headers: { Authorization: "Bearer <attacker-token>" }
+  admin:
+    headers: {}                                            # optional → enables priv-esc checks
+  endpoints: ["/api/orders", "/api/orders/1"]              # a list endpoint + a param placeholder
+  id_enumeration: true                                     # harvest the victim's real ids
+```
+
+- **1 account** (victim) → missing-auth (a protected resource readable with no login)
+- **2 accounts** (victim + attacker) → horizontal **IDOR / BOLA**
+- **+ admin** → vertical **privilege escalation**
+
+AURA discovers endpoints from the OpenAPI spec, crawler and archives too, so often you only need the accounts. It's **GET-only, never mutates**, scope-checks every URL, and never writes credentials to a report.
 
 ---
 
