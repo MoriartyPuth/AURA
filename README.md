@@ -12,7 +12,7 @@ A phase-based web audit orchestrator. It wraps the recon/vuln toolchain (nuclei,
 
 ---
 
-## ⚡ Quick Start
+## Quick Start
 
 ```
 cd Aura
@@ -41,7 +41,7 @@ External tools are optional — any that are missing are skipped: `subfinder ass
 
 ---
 
-## 🛠️ Audit Lifecycle
+## Audit Lifecycle
 
 **Phase 0 — Recon.** OSINT (crt.sh, Shodan, Wayback/gau, WHOIS/DNS, favicon hash) plus active discovery (naabu/nmap, httpx, arjun, subfinder, in-scope crawler with JS endpoint extraction). Runs in parallel. With an `auth:` block the crawler runs authenticated, feeding the post-login surface to later phases. Optional S3/GCS/Azure bucket probes (opt-out).
 
@@ -55,7 +55,7 @@ External tools are optional — any that are missing are skipped: `subfinder ass
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 Tune via `config.yaml`:
 
@@ -74,6 +74,6 @@ settings:
 
 ---
 
-## ⚖️ Legal
+## Legal
 
 **FOR AUTHORIZED USE ONLY.** For security professionals and authorized auditing. The author is not responsible for misuse or damage. Use your power for good.
