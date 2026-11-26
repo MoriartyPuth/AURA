@@ -56,7 +56,7 @@ External tools are optional — any that are missing are skipped: `subfinder ass
 
 ## Audit Lifecycle
 
-**Phase 0 — Recon.** OSINT (crt.sh, Shodan InternetDB — keyless ports/CVEs, Wayback/gau, WHOIS/DNS, favicon hash) plus active discovery (naabu top-1000 → nmap `-sV` on just the open ports, httpx, arjun, subfinder, in-scope crawler with JS endpoint extraction). A port in the target URL is always scanned. Runs in parallel. With an `auth:` block the crawler runs authenticated, feeding the post-login surface to later phases. Optional S3/GCS/Azure bucket probes (opt-out).
+**Phase 0 — Recon.** OSINT (crt.sh, Shodan InternetDB — keyless ports/CVEs, Wayback/gau, WHOIS/DNS, favicon hash) plus active discovery (naabu top-1000 → nmap `-sV` on just the open ports, httpx, arjun, subfinder, in-scope crawler with JS endpoint extraction, **OpenAPI/Swagger discovery** — finds the spec, expands its paths into concrete in-scope URLs, and feeds them to the authz engine / probes / fuzzer). A port in the target URL is always scanned. Runs in parallel. With an `auth:` block the crawler runs authenticated, feeding the post-login surface to later phases. Optional S3/GCS/Azure bucket probes (opt-out).
 
 **Phase 1 — Identity, logic & misconfig.** Sensitive-path probing with soft-404 filtering; JWT discovery + `alg=none`; sqlmap/dalfox on real parameterised URLs; SSTI/LFI/XXE/CRLF/CORS/open-redirect/smuggling checks; subzy/subjack takeover. **Authz (opt-in):** replays in-scope endpoints across victim/attacker/anonymous (and admin) accounts to find IDOR/BOLA, missing-auth and privilege escalation. GET-only, never mutates, creds never written to reports.
 
