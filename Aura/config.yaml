@@ -1,3 +1,6 @@
+# Host intel uses Shodan InternetDB by default — free, NO API KEY needed
+# (open ports / known CVEs / hostnames per IP). The key below is optional and only
+# enables Shodan's paid search API; leave it as-is to run keyless.
 shodan:
   api_key: "YOUR_SHODAN_API_KEY"
 
@@ -37,7 +40,7 @@ scope:
   url_regex: ""
   # Cloud checks probe *guessed* bucket names on AWS/GCP/Azure, which may belong
   # to someone else. Set false if your engagement/program rules forbid that.
-  allow_cloud_bucket_probes: true
+  allow_cloud_bucket_probes: false
 
 # Two-account authorization testing (IDOR/BOLA). OFF by default. Only runs when
 # enabled AND both accounts are set. GET-only, scope-checked, never mutates.
