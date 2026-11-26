@@ -49,6 +49,52 @@ class TestNaabuPorts(unittest.TestCase):
         self.assertEqual(parse_naabu_ports(out), [80, 443])
 
 
+class TestTargetPortSeeding(unittest.TestCase):
+    def _engine(self, target, naabu_ports=""):
+        from core.engine import AuraEngine
+        e = AuraEngine.__new__(AuraEngine)
+        e.target = target
+        e.domain = "host"
+        e.config = {"settings": {"naabu_ports": naabu_ports}}
+        e._cache, e._cache_locks = {}, {}
+        import threading
+        e._cache_guard = threading.Lock()
+        return e
+
+    def test_explicit_port_extracted(self):
+        from modules.recon import surface_mgr
+        self.assertEqual(surface_mgr.target_port(self._engine("http://1.2.3.4:30139")), 30139)
+        self.assertIsNone(surface_mgr.target_port(self._engine("https://example.com")))
+
+    def test_naabu_defaults_to_top_1000(self):
+        from modules.recon import surface_mgr
+        self.assertEqual(surface_mgr._naabu_port_args(self._engine("http://x")), ["-top-ports", "1000"])
+        self.assertEqual(
+            surface_mgr._naabu_port_args(self._engine("http://x", naabu_ports="1-65535")),
+            ["-p", "1-65535"])
+
+    def test_target_port_always_included(self):
+        from modules.recon import surface_mgr
+        e = self._engine("http://1.2.3.4:30139")
+        orig = (surface_mgr.is_tool_available, surface_mgr.run_command)
+        surface_mgr.is_tool_available = lambda _n: True
+        surface_mgr.run_command = lambda *a, **k: (0, "host:80\nhost:443\n", "")
+        try:
+            self.assertEqual(surface_mgr.collect_open_ports(e), [80, 443, 30139])
+        finally:
+            surface_mgr.is_tool_available, surface_mgr.run_command = orig
+
+    def test_target_port_used_when_naabu_missing(self):
+        from modules.recon import surface_mgr
+        e = self._engine("http://1.2.3.4:30139")
+        orig = surface_mgr.is_tool_available
+        surface_mgr.is_tool_available = lambda _n: False
+        try:
+            self.assertEqual(surface_mgr.collect_open_ports(e), [30139])
+        finally:
+            surface_mgr.is_tool_available = orig
+
+
 class FakeEngine:
     domain = "x.com"
     config = {}
