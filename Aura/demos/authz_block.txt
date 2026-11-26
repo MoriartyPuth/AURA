@@ -1,0 +1,10 @@
+====================================================================================================
+AURA RESULTS  http://localhost:8888  (victim + attacker accounts)
+====================================================================================================
+CRITICAL 1  HIGH 0  MEDIUM 0  LOW 0  INFO 0
+
+[CRITICAL] (1)
+  ● Broken authorization (horizontal/IDOR): http://localhost:8888/workshop/api/shop/orders/6  [verified, conf=high]
+    Authorization (IDOR/BOLA) Checks · score 113
+    http://localhost:8888/workshop/api/shop/orders/6
+====================================================================================================

@@ -11,6 +11,20 @@ A phase-based web audit orchestrator. It wraps the recon/vuln toolchain (nuclei,
 
 ---
 
+## See it work
+
+**Broken access control (IDOR / BOLA)** — two accounts in, AURA replays every endpoint and flags where an attacker reads the victim's data. Caught a real BOLA on OWASP crAPI with no false positive on the per-user control endpoint:
+
+![AURA finding an IDOR/BOLA on crAPI](Aura/demos/authz.svg)
+
+**CVE detection** — one nuclei pass, CVE hits enriched inline with CVSS + exploit refs:
+
+![AURA finding CVE-2025-55182, CVSS 10](Aura/demos/cve.svg)
+
+More in [`Aura/demos/`](Aura/demos/).
+
+---
+
 ## Quick Start
 
 ```
