@@ -61,8 +61,6 @@ def print_banner():
 {Fore.CYAN}   ░   ▒     ░░░ ░ ░   ░░   ░   ░   ▒   
 {Fore.CYAN}       ░  ░    ░        ░           ░  ░
 
-{Fore.WHITE}{Style.BRIGHT} [ AURA-SCANNER v1.0 ] - {Fore.CYAN}National Infrastructure Auditor
-{Fore.WHITE}{Style.DIM} Author: Bubble
 {Fore.BLUE} ──────────────────────────────────────────────────────────
     """
     print(banner)
