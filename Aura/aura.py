@@ -15,6 +15,7 @@ from modules.recon.urlintel_mgr import run_url_intel
 from modules.recon.surface_mgr import run_surface_discovery
 from modules.recon.service_mgr import run_service_enrichment
 from modules.recon.param_mining_mgr import run_param_mining
+from modules.recon.api_discovery_mgr import run_api_discovery
 from modules.auth.id_logic import check_identity_leaks
 from modules.auth.jwt_mgr import analyze_jwt_exposure
 from modules.auth.authz_mgr import run_authz_checks
@@ -201,6 +202,7 @@ def main():
         ("Surface Discovery", lambda: run_surface_discovery(engine)),
         ("Service Enrichment", lambda: run_service_enrichment(engine)),
         ("Parameter Mining", lambda: run_param_mining(engine)),
+        ("API Spec Discovery", lambda: run_api_discovery(engine)),
         ("Cloud & Infra Checks", lambda: run_cloud_checks(engine)),
     ]
     if profile_cfg.get("enable_crawler", True):
