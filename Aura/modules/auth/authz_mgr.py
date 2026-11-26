@@ -31,6 +31,7 @@ from urllib.parse import urlparse
 from core.findings import Finding
 from core.http_utils import build_session
 from core.logger import Logger
+from core.parallel import http_workers, pmap
 from utils.url_seeds import load_url_seeds
 
 # Bodies at least this similar (0-1) are treated as "the same resource".
@@ -117,61 +118,74 @@ def run_authz_checks(engine):
     admin_s = _session_for(engine, admin) if admin.get("headers") else None
 
     max_urls = int(auth_cfg.get("max_urls", 150))
-    tested = 0
+    workers = http_workers(engine.config)
 
     # Horizontal + missing-auth: resource owner is the victim (same level as attacker).
-    for url in _candidate_urls(engine, auth_cfg.get("endpoints")):
-        if tested >= max_urls:
-            break
-        if not engine.scope.is_in_scope(url):
-            continue
+    def check_horizontal(url):
+        """-> (tested, finding|None) for one URL."""
         v_status, v_body = _fetch(victim_s, url)
         if not _looks_authenticated(v_status, v_body):
-            continue  # victim can't see a real resource here; nothing to compare
-        tested += 1
-
+            return False, None  # victim can't see a real resource here; nothing to compare
         if _probe_sees_owner(v_body, _fetch(attacker_s, url)):
             Logger.critical(f"IDOR/BOLA: attacker account reads victim resource at {url}")
-            findings.append(Finding(
+            return True, Finding(
                 title=f"Broken authorization (horizontal/IDOR): {url}",
                 severity="critical", confidence="high", verified=True, url=url,
                 evidence="Attacker account received a response matching the victim's resource.",
                 extra={"class": "idor"},
-            ))
-            continue
-
+            )
         if _probe_sees_owner(v_body, _fetch(anon_s, url)):
             Logger.critical(f"MISSING AUTH: unauthenticated request reads protected resource at {url}")
-            findings.append(Finding(
+            return True, Finding(
                 title=f"Missing authentication: {url}",
                 severity="critical", confidence="high", verified=True, url=url,
                 evidence="Unauthenticated request received the protected resource.",
                 extra={"class": "missing-auth"},
-            ))
+            )
+        return True, None
+
+    urls = [u for u in _candidate_urls(engine, auth_cfg.get("endpoints")) if engine.scope.is_in_scope(u)]
+    tested = _run_capped(check_horizontal, urls, max_urls, workers, findings)
 
     # Vertical privilege escalation: resource owner is the admin; the low-priv
     # attacker must NOT be able to reach it. Needs an admin account configured.
     if admin_s is not None:
-        vtested = 0
-        admin_urls = _candidate_urls(engine, auth_cfg.get("admin_endpoints"))
-        for url in admin_urls:
-            if vtested >= max_urls:
-                break
-            if not engine.scope.is_in_scope(url):
-                continue
+        def check_vertical(url):
             ad_status, ad_body = _fetch(admin_s, url)
             if not _looks_authenticated(ad_status, ad_body):
-                continue  # admin sees no real resource here
-            vtested += 1
+                return False, None  # admin sees no real resource here
             if _probe_sees_owner(ad_body, _fetch(attacker_s, url)):
                 Logger.critical(f"PRIV-ESC: low-priv account reaches admin resource at {url}")
-                findings.append(Finding(
+                return True, Finding(
                     title=f"Broken authorization (vertical privilege escalation): {url}",
                     severity="critical", confidence="high", verified=True, url=url,
                     evidence="Low-privilege attacker account received the admin's resource.",
                     extra={"class": "privilege-escalation"},
-                ))
-        tested += vtested
+                )
+            return True, None
+
+        admin_urls = [u for u in _candidate_urls(engine, auth_cfg.get("admin_endpoints")) if engine.scope.is_in_scope(u)]
+        tested += _run_capped(check_vertical, admin_urls, max_urls, workers, findings)
 
     Logger.success(f"Authz checks: tested {tested} endpoints, {len(findings)} findings")
     return findings
+
+
+def _run_capped(check, urls, max_tested, workers, findings):
+    """Run `check(url) -> (tested, finding)` over urls in concurrent batches, stopping
+    once `max_tested` URLs were actually tested. Results are consumed in URL order, so
+    the cap and the findings match the serial behaviour (a batch may overshoot a few
+    requests, but extra results past the cap are discarded)."""
+    tested = 0
+    for i in range(0, len(urls), workers):
+        if tested >= max_tested:
+            break
+        for was_tested, finding in pmap(check, urls[i:i + workers], workers):
+            if tested >= max_tested:
+                break
+            if not was_tested:
+                continue
+            tested += 1
+            if finding is not None:
+                findings.append(finding)
+    return tested

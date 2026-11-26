@@ -66,7 +66,10 @@ def build_session(config):
         allowed_methods=["GET", "POST", "HEAD", "OPTIONS"],
         respect_retry_after_header=True,  # honor the server's Retry-After on 429/503
     )
-    adapter = HTTPAdapter(max_retries=retry)
+    # Pool large enough for concurrent module requests (see core.parallel.http_workers),
+    # otherwise urllib3 discards and re-opens connections under load.
+    pool = max(10, int(settings.get("http_workers", 8) or 8))
+    adapter = HTTPAdapter(max_retries=retry, pool_connections=pool, pool_maxsize=pool)
     session.mount("http://", adapter)
     session.mount("https://", adapter)
     session.headers.update({"User-Agent": settings.get("user_agent") or DEFAULT_USER_AGENT})

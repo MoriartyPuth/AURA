@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 from core.logger import Logger
 from core.http_utils import tool_footprint
+from core.parallel import pmap, tool_workers
 from core.tool_runner import is_tool_available, run_command
 from utils.url_seeds import load_url_seeds
 
@@ -124,13 +125,23 @@ def run_web_probes(engine):
         ("dalfox", "XSS", "q=test", _run_dalfox),
         ("sqlmap", "SQLi", "id=1", _run_sqlmap),
     ]
+    jobs = []
     for tool_name, label, fallback_query, runner in probes:
         if not is_tool_available(tool_name):
             Logger.warn(f"{tool_name} not found. Skipping.")
             continue
         for url in select_probe_urls(engine, fallback_query, max_urls):
-            Logger.info(f"Phase 1: {label} probe with {tool_name} -> {url}")
-            for finding in runner(url, footprint):
-                Logger.critical(finding)
-                findings.append(finding)
+            jobs.append((tool_name, label, runner, url))
+
+    # Each dalfox/sqlmap run targets one URL and can take minutes; run a few at once
+    # (settings.tool_workers). Each process keeps its own tool_rate_limit cap.
+    def run_job(job):
+        tool_name, label, runner, url = job
+        Logger.info(f"Phase 1: {label} probe with {tool_name} -> {url}")
+        return runner(url, footprint)
+
+    for job_findings in pmap(run_job, jobs, tool_workers(engine.config)):
+        for finding in job_findings:
+            Logger.critical(finding)
+            findings.append(finding)
     return findings
