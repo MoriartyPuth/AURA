@@ -5,6 +5,16 @@ from core.tool_runner import is_tool_available, run_command
 from modules.recon.subdomain_mgr import collect_subdomains
 
 
+def _is_takeover_hit(line):
+    """True only for a genuinely vulnerable subzy/subjack line. The tools also print
+    "[ NOT VULNERABLE ]" for safe subdomains, which contains the substring
+    "vulnerable" - so a bare `in` match reports every safe result as a finding."""
+    low = line.lower()
+    if "not vulnerable" in low or "not-vulnerable" in low:
+        return False
+    return "vulnerable" in low or "takeover" in low
+
+
 def run_takeover_checks(engine):
     findings = []
     subdomains = collect_subdomains(engine)
@@ -32,7 +42,7 @@ def _subzy(engine, sub_file):
         if code == 0:
             for line in out.splitlines():
                 msg = line.strip()
-                if "vulnerable" in msg.lower():
+                if _is_takeover_hit(msg):
                     findings.append(f"Takeover: {msg}")
                     Logger.critical(f"Takeover risk: {msg}")
         elif err:
@@ -57,7 +67,7 @@ def _subjack(engine, sub_file):
         if code == 0:
             for line in out.splitlines():
                 msg = line.strip()
-                if "vulnerable" in msg.lower() or "takeover" in msg.lower():
+                if _is_takeover_hit(msg):
                     findings.append(f"Takeover: {msg}")
                     Logger.critical(f"Takeover risk: {msg}")
         elif err:
