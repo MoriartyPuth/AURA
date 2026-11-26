@@ -25,6 +25,8 @@ requests (never mutates), and scope-checks every URL first. config.yaml:
 
 Credentials are read from config/CLI only and never written to any report.
 """
+import json
+import re
 from difflib import SequenceMatcher
 from urllib.parse import urlparse
 
@@ -99,6 +101,107 @@ def _probe_sees_owner(owner_body, probe_result):
     return _looks_authenticated(status, body) and _same_resource(owner_body, body)
 
 
+# --- ID enumeration -------------------------------------------------------
+# Discovery fills path params with a placeholder (/orders/1). To catch a BOLA the
+# owner must actually own the tested id, so we harvest the owner's real ids from
+# their own responses (and list endpoints) and substitute them into numeric path
+# segments, plus a small sequential window to catch guessable-id IDOR.
+_ID_KEY_RE = re.compile(r"(?:^id$|_id$|Id$)")
+_MAX_ID = 10 ** 12
+
+
+def _ids_from_json(obj, out, depth=0):
+    if depth > 6 or len(out) > 200:
+        return
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if _ID_KEY_RE.search(str(k)):
+                if isinstance(v, bool):
+                    continue
+                if isinstance(v, int) and 0 < v < _MAX_ID:
+                    out.add(v)
+                elif isinstance(v, str) and v.isdigit() and 0 < int(v) < _MAX_ID:
+                    out.add(int(v))
+            _ids_from_json(v, out, depth + 1)
+    elif isinstance(obj, list):
+        for x in obj[:50]:
+            _ids_from_json(x, out, depth + 1)
+
+
+def _path_ids(url):
+    return {int(seg) for seg in urlparse(url).path.split("/")
+            if seg.isdigit() and 0 < int(seg) < _MAX_ID}
+
+
+def harvest_ids(fetch_fn, urls, workers, limit=25):
+    """Fetch each url as the owner and collect id-like values from JSON bodies and
+    from numeric path segments. `fetch_fn(url) -> (status, body)`."""
+    found = set()
+
+    def grab(url):
+        ids = set(_path_ids(url))
+        status, body = fetch_fn(url)
+        if status == 200 and body:
+            try:
+                _ids_from_json(json.loads(body), ids)
+            except (ValueError, TypeError):
+                pass
+        return ids
+
+    for ids in pmap(grab, urls, workers):
+        found |= ids
+    return sorted(found)[:limit]
+
+
+def expand_with_ids(urls, ids, neighbor=1, per_url_cap=40, total_cap=600):
+    """For each url with a numeric path segment, add variants substituting each
+    harvested id (and ±neighbor of the segment already present). Originals kept."""
+    out, seen = [], set()
+
+    def add(u):
+        if u not in seen:
+            seen.add(u)
+            out.append(u)
+
+    for url in urls:
+        add(url)
+        pu = urlparse(url)
+        parts = pu.path.split("/")
+        slots = [i for i, p in enumerate(parts) if p.isdigit()]
+        if not slots or len(out) >= total_cap:
+            continue
+        sub = set(ids)
+        for i in slots:  # sequential window around the id already in the path
+            n = int(parts[i])
+            sub.update(n + d for d in range(-neighbor, neighbor + 1) if n + d > 0)
+        made = 0
+        for i in slots:
+            for new_id in sorted(sub):
+                if made >= per_url_cap or len(out) >= total_cap:
+                    break
+                variant = list(parts)
+                variant[i] = str(new_id)
+                add(pu._replace(path="/".join(variant)).geturl())
+                made += 1
+    return out[:total_cap]
+
+
+def _candidate_urls_enumerated(engine, auth_cfg, extra_paths, owner_fetch):
+    """Base candidate urls, plus id-substituted variants when id enumeration is on."""
+    base = [u for u in _candidate_urls(engine, extra_paths) if engine.scope.is_in_scope(u)]
+    if not auth_cfg.get("id_enumeration", True):
+        return base
+    workers = http_workers(engine.config)
+    ids = harvest_ids(owner_fetch, base, workers)
+    neighbor = int(auth_cfg.get("id_neighbor_window", 1))
+    expanded = [u for u in expand_with_ids(base, ids, neighbor=neighbor)
+                if engine.scope.is_in_scope(u)]
+    if len(expanded) > len(base):
+        Logger.info(f"Authz: id enumeration harvested {len(ids)} ids -> "
+                    f"{len(expanded)} candidate urls (from {len(base)}).")
+    return expanded
+
+
 def run_authz_checks(engine):
     findings = []
     auth_cfg = engine.config.get("auth", {})
@@ -144,7 +247,8 @@ def run_authz_checks(engine):
             )
         return True, None
 
-    urls = [u for u in _candidate_urls(engine, auth_cfg.get("endpoints")) if engine.scope.is_in_scope(u)]
+    urls = _candidate_urls_enumerated(engine, auth_cfg, auth_cfg.get("endpoints"),
+                                      lambda u: _fetch(victim_s, u))
     tested = _run_capped(check_horizontal, urls, max_urls, workers, findings)
 
     # Vertical privilege escalation: resource owner is the admin; the low-priv
@@ -164,7 +268,8 @@ def run_authz_checks(engine):
                 )
             return True, None
 
-        admin_urls = [u for u in _candidate_urls(engine, auth_cfg.get("admin_endpoints")) if engine.scope.is_in_scope(u)]
+        admin_urls = _candidate_urls_enumerated(engine, auth_cfg, auth_cfg.get("admin_endpoints"),
+                                                lambda u: _fetch(admin_s, u))
         tested += _run_capped(check_vertical, admin_urls, max_urls, workers, findings)
 
     Logger.success(f"Authz checks: tested {tested} endpoints, {len(findings)} findings")
