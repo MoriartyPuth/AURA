@@ -5,7 +5,6 @@
   [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python)](https://www.python.org/)
   [![Status](https://img.shields.io/badge/Status-Stable-green?style=for-the-badge)](https://github.com/bubble/Aura-Scanner)
 
- <img width="656" height="277" alt="Aura Logo" src="https://github.com/user-attachments/assets/262b9981-3b2c-48f3-ab4c-d0d3ef7dd925" />
 </div>
 
 A phase-based web audit orchestrator. It wraps the recon/vuln toolchain (nuclei, httpx, naabu, sqlmap, dalfox, ffuf, …), turns the raw output into deduped, severity-scored findings, and prints them to your terminal — so you can skip the busywork and go straight to manual exploitation.
