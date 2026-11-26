@@ -57,6 +57,9 @@ auth:
   endpoints: []        # optional extra authenticated-only paths, e.g. ["/api/me"]
   admin_endpoints: []  # optional admin-only paths, e.g. ["/admin", "/admin/users"]
   max_urls: 150
+  id_enumeration: true     # harvest the owner's real ids and substitute them into
+                           # numeric path segments (/orders/1 -> /orders/<owned id>)
+  id_neighbor_window: 1    # also try id ±N of a path's existing numeric segment (sequential IDOR)
 
 state:
   file: "reports/scan_state.json"
