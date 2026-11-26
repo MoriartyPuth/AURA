@@ -1,5 +1,6 @@
 from core.http_utils import build_session
 from core.logger import Logger
+from core.parallel import http_workers, pmap
 from core.soft404 import get_soft404_detector
 
 SENSITIVE_PATHS = [
@@ -13,15 +14,17 @@ def check_identity_leaks(engine):
     findings = []
     session = build_session(engine.config)
     soft404 = get_soft404_detector(engine, session)
-    for path in SENSITIVE_PATHS:
-        url = f"{engine.target}{path}"
-        if not engine.scope.is_in_scope(url):
-            continue
+    paths = [p for p in SENSITIVE_PATHS if engine.scope.is_in_scope(f"{engine.target}{p}")]
+
+    def probe(path):
         try:
-            r = session.get(url, allow_redirects=False)
+            return path, session.get(f"{engine.target}{path}", allow_redirects=False)
         except Exception:
-            continue
-        if r.status_code != 200 or soft404.is_soft404(r, path):
+            return path, None
+
+    for path, r in pmap(probe, paths, http_workers(engine.config)):
+        url = f"{engine.target}{path}"
+        if r is None or r.status_code != 200 or soft404.is_soft404(r, path):
             continue
         content = (r.text or "").lower()
         if any(x in content for x in LEAK_MARKERS):

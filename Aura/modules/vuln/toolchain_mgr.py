@@ -1,4 +1,5 @@
 from core.logger import Logger
+from core.parallel import pmap
 from core.tool_runner import is_tool_available, run_command
 
 
@@ -23,16 +24,17 @@ def _run_update(tool):
 
 
 def run_toolchain_health(engine, update_templates=False):
-    findings = []
-    for tool in TOOLS:
-        if is_tool_available(tool):
-            findings.append(f"Tool Ready: {tool}")
-            code, out, err = run_command([tool, "-version"], timeout=20)
-            text = out or err
-            if code == 0 and text:
-                findings.append(f"Tool Version: {tool} | {_first_line(text)}")
-        else:
-            findings.append(f"Tool Missing: {tool}")
+    def check(tool):
+        if not is_tool_available(tool):
+            return [f"Tool Missing: {tool}"]
+        out_lines = [f"Tool Ready: {tool}"]
+        code, out, err = run_command([tool, "-version"], timeout=20)
+        text = out or err
+        if code == 0 and text:
+            out_lines.append(f"Tool Version: {tool} | {_first_line(text)}")
+        return out_lines
+
+    findings = [line for lines in pmap(check, TOOLS, len(TOOLS)) for line in lines]
 
     if update_templates:
         Logger.info("Toolchain: updating nuclei templates...")

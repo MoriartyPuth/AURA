@@ -1,10 +1,21 @@
 from core.logger import Logger
+from core.parallel import run_parallel
 from core.tool_runner import is_tool_available, run_command
 
 
 def run_deep_scans(target, wordlist=None, rate_limit=0, proxy=""):
+    # ffuf (content discovery) and wapiti (vuln scan) are independent -> run concurrently.
     findings = []
+    for part in run_parallel(
+        lambda: _ffuf(target, wordlist, rate_limit, proxy),
+        lambda: _wapiti(target, proxy),
+    ):
+        findings.extend(part)
+    return findings
 
+
+def _ffuf(target, wordlist, rate_limit, proxy):
+    findings = []
     if is_tool_available("ffuf") and wordlist:
         Logger.info("Phase 2: running ffuf content discovery...")
         cmd = [
@@ -31,7 +42,11 @@ def run_deep_scans(target, wordlist=None, rate_limit=0, proxy=""):
         Logger.warn("ffuf skipped. No wordlist configured.")
     else:
         Logger.warn("ffuf not found. Skipping.")
+    return findings
 
+
+def _wapiti(target, proxy):
+    findings = []
     if is_tool_available("wapiti"):
         Logger.info("Phase 2: running wapiti web vulnerability scan...")
         wcmd = ["wapiti", "-u", target, "--scope", "folder", "-f", "txt"]
@@ -46,5 +61,4 @@ def run_deep_scans(target, wordlist=None, rate_limit=0, proxy=""):
             Logger.warn("wapiti returned non-zero.")
     else:
         Logger.warn("wapiti not found. Skipping.")
-
     return findings

@@ -1,6 +1,7 @@
 import os
 
 from core.logger import Logger
+from core.parallel import pmap
 from core.tool_runner import is_tool_available, run_command
 
 URL_SEED_FILE = "reports/urls_historical.txt"
@@ -20,15 +21,20 @@ def _run_url_tools(domain):
         ("gau", ["gau", "--subs", domain]),
         ("waybackurls", ["waybackurls", domain]),
     ]
-    for tool_name, cmd in tools:
+
+    def run_tool(job):  # gau and waybackurls are independent -> run concurrently
+        tool_name, cmd = job
         if not is_tool_available(tool_name):
             Logger.warn(f"{tool_name} not found. Skipping.")
-            continue
+            return ""
         Logger.info(f"Recon: collecting URLs via {tool_name}...")
         code, out, err = run_command(cmd, timeout=180)
         if code != 0 and err:
             Logger.warn(f"{tool_name} returned non-zero: {err}")
-            continue
+            return ""
+        return out
+
+    for out in pmap(run_tool, tools, len(tools)):
         seen.update(u.strip() for u in out.splitlines() if u.strip())
     return sorted(seen)
 

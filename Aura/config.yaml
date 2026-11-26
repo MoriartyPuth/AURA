@@ -10,6 +10,12 @@ settings:
   retry_backoff: 1.0       # exponential backoff factor; honours server Retry-After
   verify_tls: true
   phase0_workers: 3        # parallel workers for Phase 0 recon (1 = serial, quietest)
+  phase1_workers: 3        # parallel Phase 1 tasks (probes, takeover, authz, ...)
+  phase2_workers: 2        # parallel Phase 2 tasks (nuclei, CVE scan, ffuf/wapiti, fuzzing)
+  http_workers: 8          # concurrent Python HTTP requests per module (paths, buckets, crawler, authz)
+  tool_workers: 2          # concurrent sqlmap/dalfox processes (each keeps tool_rate_limit)
+  # Speed vs. noise: each worker adds traffic. For the quietest scan set all of the
+  # above to 1 (pacing via request_delay/jitter still applies across threads).
   # Low-noise defaults. A real browser UA (not "Aura-Scanner") avoids the obvious
   # WAF block; pacing + jitter space out the Python requests.
   user_agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"

@@ -1,5 +1,6 @@
 import os
 from core.logger import Logger
+from core.parallel import run_parallel
 from core.tool_runner import is_tool_available, run_command
 from modules.recon.subdomain_mgr import collect_subdomains
 
@@ -16,6 +17,14 @@ def run_takeover_checks(engine):
     with open(sub_file, "w", encoding="utf-8") as f:
         f.write("\n".join(subdomains) + "\n")
 
+    # subzy and subjack are independent -> run them concurrently.
+    for part in run_parallel(lambda: _subzy(engine, sub_file), lambda: _subjack(engine, sub_file)):
+        findings.extend(part)
+    return findings
+
+
+def _subzy(engine, sub_file):
+    findings = []
     if is_tool_available("subzy"):
         Logger.info("Phase 1: running subzy takeover checks...")
         cmd = ["subzy", "run", "--targets", sub_file, "--hide_fails", "--verify_ssl"]
@@ -31,6 +40,11 @@ def run_takeover_checks(engine):
     else:
         Logger.warn("subzy not found. Skipping.")
 
+    return findings
+
+
+def _subjack(engine, sub_file):
+    findings = []
     if is_tool_available("subjack"):
         Logger.info("Phase 1: running subjack takeover checks...")
         fingerprints = engine.config.get("tools", {}).get("subjack_fingerprints", "")

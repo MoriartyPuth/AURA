@@ -77,5 +77,25 @@ class TestAuthenticatedCrawl(unittest.TestCase):
         self.assertIn("unauthenticated", findings[0])
 
 
+class TestCrawlerJsDedupe(unittest.TestCase):
+    def test_shared_bundle_fetched_once(self):
+        page = '<html><a href="/a">a</a><a href="/b">b</a><script src="/app.js"></script></html>'
+        session = RecordingSession({
+            "https://app.test": page, "https://app.test/a": page, "https://app.test/b": page,
+            "https://app.test/app.js": 'fetch("/api/users")',
+        })
+        orig = crawler_mgr.build_authed_session
+        crawler_mgr.build_authed_session = lambda _c, _a="victim": session
+        cwd, tmp = os.getcwd(), tempfile.mkdtemp()
+        os.chdir(tmp)
+        try:
+            findings = crawler_mgr.run_crawler_pipeline(FakeEngine({}), max_pages=10)
+        finally:
+            os.chdir(cwd)
+            crawler_mgr.build_authed_session = orig
+        self.assertEqual(session.requested.count("https://app.test/app.js"), 1)
+        self.assertIn("JS Endpoint: https://app.test/api/users", findings)
+
+
 if __name__ == "__main__":
     unittest.main()
