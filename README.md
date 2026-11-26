@@ -85,13 +85,24 @@ Aura refuses to start if the target itself is out of scope. `--include-domain`, 
 ---
 
 ## ⚡ Quick Start
-Run from inside the `Aura/` directory (config and wordlist paths are relative):
 
 ```
 cd Aura
-pip install -r requirements.txt
-python3 aura.py -t https://target.com
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python aura.py -t https://target.com
 ```
+
+Findings print to the terminal when the scan ends — grouped by severity, highest risk first. The PDF is opt-in (`--pdf`, or `-o report.pdf`).
+
+**Run it from anywhere.** Symlink the launcher once and just type `aura`:
+
+```
+ln -s "$PWD/aura" ~/.local/bin/aura    # ~/.local/bin must be on your PATH
+aura -t https://target.com
+aura -t https://target.com --profile deep --pdf
+```
+
+The launcher cd's into the project and adds `~/go/bin` + `~/.local/bin` to PATH, so your installed scanners are found.
 
 External tools are optional — any that are missing are skipped: `subfinder assetfinder gau waybackurls naabu httpx nmap arjun subzy subjack whatweb nikto dalfox sqlmap nuclei ffuf wapiti`.
 
@@ -108,7 +119,7 @@ Aura-Scanner uses Profiles to balance speed and depth. Choose the profile that m
 * **Usage:**
 
 ```
-python3 aura.py -t https://target.com --profile quick
+aura -t https://target.com --profile quick
 ```
 
 2. The 'Normal' Profile (Default)
@@ -122,7 +133,7 @@ Best for: Standard security assessments and compliance checks.
 * **Usage:**
 
 ```
-python3 aura.py -t https://target.com --profile normal
+aura -t https://target.com --profile normal
 ```
 3. The 'Deep' Profile
 
@@ -134,7 +145,7 @@ Best for: Full-scale penetration testing and red-teaming.
 
 * **Usage:**
 ```
-python3 aura.py -t https://target.com --profile deep
+aura -t https://target.com --profile deep
 ```
 
 ---

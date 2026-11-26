@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# AURA launcher — run `aura -t example.com` from any directory.
+#
+# Resolves its own location (following symlinks), so a symlink such as
+# ~/.local/bin/aura -> <repo>/Aura/aura keeps working even if the repo moves.
+# It cd's into the project (config.yaml / reports/ / wordlists/ are resolved
+# relative to the cwd) and adds the Go/pipx tool dirs to PATH.
+set -euo pipefail
+
+HERE="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+
+# External scanners installed via `go install` (~/go/bin) and pipx (~/.local/bin).
+export PATH="$PATH:${GOBIN:-$HOME/go/bin}:$HOME/.local/bin"
+
+# Prefer the project virtualenv; fall back to system python3.
+PY="$HERE/.venv/bin/python"
+[ -x "$PY" ] || PY="$(command -v python3)"
+
+cd "$HERE"
+exec "$PY" aura.py "$@"
