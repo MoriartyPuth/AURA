@@ -5,7 +5,7 @@ shodan:
   api_key: "YOUR_SHODAN_API_KEY"
 
 ipinfo:
-  token: "YOUR_IPINFO_TOKEN"
+  token: "YOUR_IPINFO_TOKEN"   # optional; without it, IP geo/ASN uses ip-api.com (keyless)
 
 settings:
   timeout: 10
